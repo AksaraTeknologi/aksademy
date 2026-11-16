@@ -923,3 +923,112 @@ it('agent:token --pii menambah ability agent:read-pii', function () {
     $user = User::where('email', 'agent-finance@agents.aksademy.local')->firstOrFail();
     expect($user->tokens()->first()->abilities)->toBe(['agent:read', 'agent:read-pii']);
 });
+
+// --- payment-reconciliation (D3) ----------------------------------------
+
+function fakeDoku(array $statuses): void
+{
+    app()->instance(\App\Services\DokuService::class, new class($statuses) extends \App\Services\DokuService {
+        public array $asked = [];
+
+        public function __construct(private array $statuses) {}
+
+        public function checkStatus(string $invoiceNumber): array
+        {
+            $this->asked[] = $invoiceNumber;
+
+            return ['status' => $this->statuses[$invoiceNumber] ?? 'NOT_FOUND', 'http' => 200];
+        }
+    });
+}
+
+function reconInvoice(string $code, string $status, array $extra = []): Invoice
+{
+    $createdAt = $extra['created_at'] ?? null;   // created_at dijaga ($guarded) → isi lewat forceFill
+    unset($extra['created_at']);
+    $inv = Invoice::create(array_merge([
+        'user_id' => User::factory()->create()->id, 'amount' => 500000, 'nett_amount' => 500000,
+        'status' => $status, 'invoice_code' => $code,
+        'paid_at' => $status === 'paid' ? '2026-11-08 10:00:00' : null,
+    ], $extra));
+    if ($createdAt) {
+        $inv->forceFill(['created_at' => $createdAt])->saveQuietly();
+    }
+
+    return $inv;
+}
+
+it('payment-reconciliation butuh token Fina dan menolak tanggal mendatang', function () {
+    fakeDoku([]);
+    agentGet('/api/v1/agent/payment-reconciliation', $this->token)->assertForbidden();
+    agentGet('/api/v1/agent/payment-reconciliation?date=2026-11-20', piiToken())->assertUnprocessable();
+});
+
+it('payment-reconciliation: cocok, lunas tanpa bukti DOKU, dan bayar DOKU yang belum tercatat', function () {
+    Carbon::setTestNow(Carbon::parse('2026-11-09 01:30:00', 'Asia/Jakarta'));
+    $created = ['created_at' => '2026-11-08 09:00:00'];
+    reconInvoice('INV-OK', 'paid', $created);                                     // cocok
+    reconInvoice('INV-PALSU', 'paid', $created);                                  // DOKU tidak SUCCESS
+    reconInvoice('INV-HILANG', 'pending', $created);                              // DOKU SUCCESS
+    reconInvoice('INV-BELUM', 'pending', $created);                               // sama-sama belum
+    reconInvoice('INV-GRATIS', 'paid', $created + ['amount' => 0, 'nett_amount' => 0]);   // dilewati
+    reconInvoice('INV-LAIN', 'paid', ['created_at' => '2026-11-01 09:00:00', 'paid_at' => '2026-11-01 10:00:00']); // hari lain
+    $parent = reconInvoice('INV-IND', 'installment_pending', $created + ['is_installment' => true]);   // induk: dilewati
+    reconInvoice('INV-T1', 'paid', $created + ['is_installment' => true, 'parent_invoice_id' => $parent->id, 'installment_number' => 1]);
+    reconInvoice('INV-T2', 'paid', $created + ['is_installment' => true, 'parent_invoice_id' => $parent->id, 'installment_number' => 2]);
+
+    fakeDoku(['INV-OK' => 'SUCCESS', 'INV-PALSU' => 'PENDING', 'INV-HILANG' => 'SUCCESS', 'INV-BELUM' => 'EXPIRED', 'INV-T1' => 'SUCCESS']);
+
+    $res = agentGet('/api/v1/agent/payment-reconciliation', piiToken())->assertOk();
+
+    expect($res->json('date'))->toBe('2026-11-08')
+        ->and($res->json('summary'))->toBe([
+            'paid_checked' => 3, 'paid_matched' => 2, 'unpaid_checked' => 2, 'unpaid_matched' => 1,
+            'unverifiable' => 1, 'doku_errors' => 0, 'skipped_limit' => 0,
+        ])
+        ->and(collect($res->json('mismatches'))->map(fn ($m) => [$m['type'], $m['invoice_code'], $m['doku_status']])->all())->toBe([
+            ['paid_not_in_doku', 'INV-PALSU', 'PENDING'],
+            ['doku_paid_not_recorded', 'INV-HILANG', 'SUCCESS'],
+        ])
+        ->and(app(\App\Services\DokuService::class)->asked)->not->toContain('INV-T2')->not->toContain('INV-IND')->not->toContain('INV-GRATIS');
+
+    expect($res->getContent())->not->toContain('@')->not->toContain('phone');
+});
+
+it('payment-reconciliation: galat DOKU dihitung terpisah, bukan dianggap tidak cocok', function () {
+    Carbon::setTestNow(Carbon::parse('2026-11-09 01:30:00', 'Asia/Jakarta'));
+    reconInvoice('INV-X', 'paid', ['created_at' => '2026-11-08 09:00:00']);
+    app()->instance(\App\Services\DokuService::class, new class extends \App\Services\DokuService {
+        public function __construct() {}
+
+        public function checkStatus(string $invoiceNumber): array
+        {
+            return ['status' => 'ERROR', 'http' => 500];
+        }
+    });
+
+    $res = agentGet('/api/v1/agent/payment-reconciliation?date=2026-11-08', piiToken())->assertOk();
+    expect($res->json('summary.doku_errors'))->toBe(1)->and($res->json('mismatches'))->toBe([]);
+});
+
+it('DokuService::checkStatus menandatangani GET tanpa Digest dan membaca transaction.status', function () {
+    config(['services.doku.client_id' => 'CID', 'services.doku.secret_key' => 'RAHASIA', 'services.doku.sandbox' => true]);
+    \Illuminate\Support\Facades\Http::fake([
+        'api-sandbox.doku.com/orders/v1/status/INV-1' => \Illuminate\Support\Facades\Http::response(['transaction' => ['status' => 'success']]),
+        'api-sandbox.doku.com/orders/v1/status/INV-404' => \Illuminate\Support\Facades\Http::response([], 404),
+    ]);
+
+    $svc = new \App\Services\DokuService();
+    expect($svc->checkStatus('INV-1'))->toBe(['status' => 'SUCCESS', 'http' => 200])
+        ->and($svc->checkStatus('INV-404')['status'])->toBe('NOT_FOUND');
+
+    \Illuminate\Support\Facades\Http::assertSent(function ($req) {
+        $h = fn ($k) => $req->header($k)[0] ?? null;
+        $expected = base64_encode(hash_hmac('sha256',
+            "Client-Id:CID\nRequest-Id:{$h('Request-Id')}\nRequest-Timestamp:{$h('Request-Timestamp')}\nRequest-Target:/orders/v1/status/INV-1",
+            'RAHASIA', true));
+
+        return $req->method() === 'GET' && str_ends_with($req->url(), '/INV-1')
+            && $h('Client-Id') === 'CID' && $h('Signature') === "HMACSHA256={$expected}";
+    });
+});

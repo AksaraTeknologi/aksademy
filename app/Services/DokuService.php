@@ -234,6 +234,49 @@ class DokuService
     }
 
     /**
+     * Cek status order di DOKU (Check Status API, hanya GET — tidak mengubah apa pun di DOKU).
+     * Dipakai rekonsiliasi harian (agent Fina, D3). Mengembalikan ['status' => SUCCESS|PENDING|FAILED|EXPIRED|…|NOT_FOUND|ERROR, 'http' => int].
+     */
+    public function checkStatus(string $invoiceNumber): array
+    {
+        try {
+            $path = '/orders/v1/status/' . rawurlencode($invoiceNumber);
+            $url = ($this->sandbox ? 'https://api-sandbox.doku.com' : 'https://api.doku.com') . $path;
+            $requestId = 'CHK-' . \Illuminate\Support\Str::uuid();
+            $requestTimestamp = $this->getRequestTimestamp();
+
+            // GET tanpa body → tanpa komponen Digest.
+            $componentSignature = "Client-Id:" . $this->clientId . "\n" .
+                "Request-Id:" . $requestId . "\n" .
+                "Request-Timestamp:" . $requestTimestamp . "\n" .
+                "Request-Target:" . $path;
+            $signature = base64_encode(hash_hmac('sha256', $componentSignature, $this->secretKey, true));
+
+            $response = Http::timeout(15)->withHeaders([
+                "Client-Id" => $this->clientId,
+                "Request-Id" => $requestId,
+                "Request-Timestamp" => $requestTimestamp,
+                "Signature" => "HMACSHA256=" . $signature,
+            ])->get($url);
+
+            if ($response->status() === 404) {
+                return ['status' => 'NOT_FOUND', 'http' => 404];
+            }
+            if (!$response->successful()) {
+                return ['status' => 'ERROR', 'http' => $response->status()];
+            }
+
+            return [
+                'status' => strtoupper((string) ($response->json('transaction.status') ?? 'UNKNOWN')),
+                'http' => $response->status(),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('DOKU Check Status gagal', ['invoice_number' => $invoiceNumber, 'message' => $e->getMessage()]);
+            return ['status' => 'ERROR', 'http' => 0];
+        }
+    }
+
+    /**
      * Verify DOKU callback signature (placeholder / pass-through)
      */
     public function verifyCallback($request): bool

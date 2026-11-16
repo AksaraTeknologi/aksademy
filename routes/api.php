@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Agent\CatalogSummaryController;
 use App\Http\Controllers\Api\Agent\FinancialMetricsController;
 use App\Http\Controllers\Api\Agent\MeetingLinkNeededController;
+use App\Http\Controllers\Api\Agent\PaymentReconciliationController;
 use App\Http\Controllers\Api\Agent\PendingInvoicesController;
 use App\Http\Controllers\Api\Agent\ProductBriefController;
 use App\Http\Controllers\Api\Agent\RecordingsPendingController;
@@ -59,6 +60,10 @@ Route::prefix('v1/agent')
         Route::get('/pending-invoices', PendingInvoicesController::class)
             ->middleware('token.ability:agent:read-pii')
             ->name('pending-invoices');
+        // Rekonsiliasi DOKU (D3): memanggil API DOKU dari server ini → khusus token Fina, dibatasi 6/menit.
+        Route::get('/payment-reconciliation', PaymentReconciliationController::class)
+            ->middleware(['token.ability:agent:read-pii', 'throttle:6,1'])
+            ->name('payment-reconciliation');
 
         Route::post('/update-meeting-link', UpdateMeetingLinkController::class)
             ->middleware('token.ability:agent:write-meeting')
