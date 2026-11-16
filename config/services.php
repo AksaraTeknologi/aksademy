@@ -76,6 +76,8 @@ return [
         'client_id'  => env('DOKU_CLIENT_ID'),
         'secret_key' => env('DOKU_SECRET_KEY'),
         'sandbox'    => env('DOKU_SANDBOX', true),
+        // Verifikasi signature callback: 'log' (default: hitung & catat, tetap terima), 'enforce' (tolak bila tidak sah).
+        'verify_callback' => env('DOKU_VERIFY_CALLBACK', 'log'),
     ],
 
 ];

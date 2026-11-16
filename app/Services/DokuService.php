@@ -277,11 +277,50 @@ class DokuService
     }
 
     /**
-     * Verify DOKU callback signature (placeholder / pass-through)
+     * Verifikasi signature HTTP Notification DOKU:
+     *   HMACSHA256=base64(hmac_sha256("Client-Id:…\nRequest-Id:…\nRequest-Timestamp:…\nRequest-Target:<path>\nDigest:<base64(sha256(body))>", secret))
+     * Request-Target = path endpoint notifikasi (mis. /api/doku/callback).
+     */
+    public function signatureValid(\Illuminate\Http\Request $request): bool
+    {
+        $header = (string) $request->header('Signature', '');
+        $clientId = (string) $request->header('Client-Id', '');
+        $requestId = (string) $request->header('Request-Id', '');
+        $timestamp = (string) $request->header('Request-Timestamp', '');
+        if ($header === '' || $requestId === '' || $timestamp === '' || !$this->secretKey
+            || !hash_equals((string) $this->clientId, $clientId)) {
+            return false;
+        }
+
+        $digest = base64_encode(hash('sha256', $request->getContent(), true));
+        $component = "Client-Id:{$clientId}\nRequest-Id:{$requestId}\nRequest-Timestamp:{$timestamp}\n"
+            . 'Request-Target:' . $request->getPathInfo() . "\nDigest:{$digest}";
+        $expected = 'HMACSHA256=' . base64_encode(hash_hmac('sha256', $component, $this->secretKey, true));
+
+        return hash_equals($expected, $header);
+    }
+
+    /**
+     * Dipakai callbackDoku. Mode `services.doku.verify_callback`:
+     *  - 'log' (default): signature dihitung & dicatat, callback tetap diterima — tahap uji agar pembayaran asli
+     *    tidak tertahan bila format DOKU berbeda dari dugaan.
+     *  - 'enforce': callback dengan signature tidak sah ditolak (401).
      */
     public function verifyCallback($request): bool
     {
-        return true;
+        $valid = $this->signatureValid($request);
+        $mode = config('services.doku.verify_callback', 'log');
+
+        Log::log($valid ? 'info' : 'warning', 'DOKU callback signature', [
+            'valid' => $valid,
+            'mode' => $mode,
+            'invoice_number' => $request->input('order.invoice_number'),
+            'transaction_status' => $request->input('transaction.status'),
+            'request_target' => $request->getPathInfo(),
+            'ip' => $request->ip(),
+        ]);
+
+        return $mode === 'enforce' ? $valid : true;
     }
 
     /**
