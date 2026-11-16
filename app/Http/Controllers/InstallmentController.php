@@ -461,6 +461,8 @@ class InstallmentController extends Controller
                 'status' => 'pending',
                 'invoice_url' => $paymentUrl,
                 'expires_at' => Carbon::now()->addHours(24),
+                // Nomor order di DOKU (beda dari invoice_code) — untuk rekonsiliasi harian (D3).
+                'doku_invoice_number' => $uniqueExternalId,
             ]);
             // ===== END DOKU =====
 

@@ -21,6 +21,7 @@ return new class extends Migration
             $table->foreignUuid('referral_user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->enum('status', ['pending', 'paid', 'failed'])->default('pending');
             $table->string('invoice_code');
+            $table->string('doku_invoice_number')->nullable();
             $table->string('invoice_url')->nullable(); //xendit
             $table->string('payment_method')->nullable(); //xendit
             $table->string('payment_channel')->nullable(); //xendit

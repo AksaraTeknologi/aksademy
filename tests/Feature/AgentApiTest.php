@@ -1032,3 +1032,19 @@ it('DokuService::checkStatus menandatangani GET tanpa Digest dan membaca transac
             && $h('Client-Id') === 'CID' && $h('Signature') === "HMACSHA256={$expected}";
     });
 });
+
+it('payment-reconciliation: termin ke-2 dst. dicek memakai doku_invoice_number, termin belum dibuka dilewati', function () {
+    Carbon::setTestNow(Carbon::parse('2026-11-09 01:30:00', 'Asia/Jakarta'));
+    $created = ['created_at' => '2026-11-08 09:00:00'];
+    $parent = reconInvoice('INV-IND2', 'installment_pending', $created + ['is_installment' => true]);
+    $term = ['is_installment' => true, 'parent_invoice_id' => $parent->id];
+    reconInvoice('INV-T2', 'paid', $created + $term + ['installment_number' => 2, 'doku_invoice_number' => 'INV-T2_1762570000']);
+    reconInvoice('INV-T3', 'pending', $created + $term + ['installment_number' => 3]);              // checkout belum dibuka
+    reconInvoice('INV-T4', 'paid', $created + $term + ['installment_number' => 4]);                 // data lama tanpa nomor
+
+    fakeDoku(['INV-T2_1762570000' => 'SUCCESS']);
+    $res = agentGet('/api/v1/agent/payment-reconciliation', piiToken())->assertOk();
+
+    expect($res->json('summary'))->toMatchArray(['paid_checked' => 1, 'paid_matched' => 1, 'unpaid_checked' => 0, 'unverifiable' => 1])
+        ->and(app(\App\Services\DokuService::class)->asked)->toBe(['INV-T2_1762570000']);
+});

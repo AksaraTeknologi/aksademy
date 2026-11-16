@@ -20,8 +20,10 @@ use Illuminate\Http\Request;
  *    (callback palsu/keliru — perlu dicek manual).
  *  - dibuat pada tanggal itu dan masih pending/gagal di Aksademy → bila DOKU SUCCESS = "doku_paid_not_recorded"
  *    (callback hilang — peserta sudah bayar tapi belum dapat akses).
- * Termin cicilan ke-2 dst. dikirim ke DOKU dengan nomor `<invoice_code>_<waktu>` yang tidak disimpan → dihitung
- * `unverifiable`, tidak dicek. Tanpa data pribadi: hanya kode invoice, nominal, dan status.
+ * Termin cicilan ke-2 dst. dikirim ke DOKU dengan nomor `<invoice_code>_<waktu>`; sejak 2026-11-16 nomor itu
+ * disimpan di `doku_invoice_number` dan dipakai untuk cek. Termin lunas tanpa nomor itu (data lama) dihitung
+ * `unverifiable`; termin belum dibayar tanpa nomor = belum pernah dibuka checkout-nya, dilewati.
+ * Tanpa data pribadi: hanya kode invoice, nominal, dan status.
  */
 class PaymentReconciliationController extends Controller
 {
@@ -43,7 +45,9 @@ class PaymentReconciliationController extends Controller
         $paid = $base()->where('status', 'paid')->whereBetween('paid_at', $day)->get();
         $unpaid = $base()->whereIn('status', ['pending', 'failed'])->whereBetween('created_at', $day)->get();
 
-        $checkable = fn (Invoice $i) => !($i->parent_invoice_id && (int) $i->installment_number > 1);
+        // Nomor order di DOKU: termin ke-2 dst. memakai doku_invoice_number; lainnya invoice_code apa adanya.
+        $dokuNumber = fn (Invoice $i) => $i->doku_invoice_number
+            ?: (($i->parent_invoice_id && (int) $i->installment_number > 1) ? null : $i->invoice_code);
 
         $summary = [
             'paid_checked' => 0, 'paid_matched' => 0,
@@ -55,8 +59,11 @@ class PaymentReconciliationController extends Controller
 
         foreach ([['paid', $paid], ['unpaid', $unpaid]] as [$group, $invoices]) {
             foreach ($invoices as $inv) {
-                if (!$checkable($inv)) {
-                    $summary['unverifiable']++;
+                $number = $dokuNumber($inv);
+                if ($number === null) {
+                    if ($group === 'paid') {
+                        $summary['unverifiable']++;
+                    }
                     continue;
                 }
                 if ($checks >= self::MAX_CHECKS) {
@@ -64,7 +71,7 @@ class PaymentReconciliationController extends Controller
                     continue;
                 }
                 $checks++;
-                $status = $doku->checkStatus($inv->invoice_code)['status'];
+                $status = $doku->checkStatus($number)['status'];
                 if ($status === 'ERROR') {
                     $summary['doku_errors']++;
                     continue;
