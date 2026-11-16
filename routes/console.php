@@ -27,7 +27,7 @@ Artisan::command('api:generate-token {email : User email for token owner} {--nam
     return self::SUCCESS;
 })->purpose('Generate Sanctum token for external API access (no login flow)');
 
-Artisan::command('agent:token {agent : Nama agent, mis. supervisor atau academic} {--keep : Jangan cabut token lama agent ini} {--write= : Izin tulis tambahan, pisahkan koma: meeting,recording}', function () {
+Artisan::command('agent:token {agent : Nama agent, mis. supervisor atau academic} {--keep : Jangan cabut token lama agent ini} {--write= : Izin tulis tambahan, pisahkan koma: meeting,recording} {--pii : Izin baca data pribadi untuk pengingat tagihan (pending-invoices)}', function () {
     $agent = strtolower((string) $this->argument('agent'));
 
     if (!preg_match('/^[a-z][a-z0-9_]{1,30}$/', $agent)) {
@@ -43,6 +43,9 @@ Artisan::command('agent:token {agent : Nama agent, mis. supervisor atau academic
         return self::FAILURE;
     }
     $abilities = array_merge(['agent:read'], array_map(fn ($w) => "agent:write-{$w}", array_unique($writes)));
+    if ($this->option('pii')) {
+        $abilities[] = 'agent:read-pii';
+    }
 
     // User khusus agent: tanpa role, password acak (tidak dipakai login).
     $user = User::firstOrCreate(
@@ -68,4 +71,4 @@ Artisan::command('agent:token {agent : Nama agent, mis. supervisor atau academic
     $this->line($token);
 
     return self::SUCCESS;
-})->purpose('Buat/rotasi token Sanctum untuk AI agent Hermes (read-only, opsional --write=meeting,recording)');
+})->purpose('Buat/rotasi token Sanctum untuk AI agent Hermes (read-only, opsional --write=meeting,recording, --pii)');

@@ -828,3 +828,98 @@ it('merinci metode bayar, kode diskon, referral tanpa data pribadi', function ()
     $body = $res->getContent();
     expect($body)->not->toContain('contoh.id')->not->toContain('081234567890')->not->toContain($buyer->id);
 });
+
+// --- pending-invoices (D5, data pribadi) --------------------------------
+
+function piiToken(): string
+{
+    $agent = User::where('email', 'agent-finance@agents.aksademy.local')->first()
+        ?? User::factory()->create(['email' => 'agent-finance@agents.aksademy.local']);
+
+    return $agent->createToken('agent-finance', ['agent:read', 'agent:read-pii'])->plainTextToken;
+}
+
+function pendingInvoice(array $attrs = [], array $userAttrs = []): Invoice
+{
+    return Invoice::create(array_merge([
+        'user_id' => User::factory()->create(array_merge(['name' => 'Budi Santoso', 'phone_number' => '0812-3456-7890'], $userAttrs))->id,
+        'amount' => 850000,
+        'nett_amount' => 850000,
+        'status' => 'pending',
+        'invoice_code' => 'INV-'.Str::random(8),
+        'invoice_url' => 'https://checkout.doku.com/'.Str::random(10),
+        'expires_at' => now()->addHours(20),
+    ], $attrs));
+}
+
+it('pending-invoices butuh ability agent:read-pii (token agent:read biasa ditolak)', function () {
+    agentGet('/api/v1/agent/pending-invoices', $this->token)->assertForbidden();
+    agentGet('/api/v1/agent/pending-invoices', piiToken())->assertOk()->assertJsonPath('contains_personal_data', true);
+});
+
+it('pending-invoices: pembelian belum bayar & belum kedaluwarsa, dengan nama, no. WA, produk, link bayar', function () {
+    $course = makeCourse(['title' => 'Kelas Excel Akuntansi']);
+    $inv = pendingInvoice();
+    EnrollmentCourse::create(['invoice_id' => $inv->id, 'course_id' => $course->id, 'price' => 850000]);
+
+    pendingInvoice(['expires_at' => now()->subHour()]);                       // kedaluwarsa
+    pendingInvoice(['status' => 'paid', 'paid_at' => now()]);                 // lunas
+    pendingInvoice(['amount' => 0, 'nett_amount' => 0]);                      // gratis
+    pendingInvoice([], ['email' => 'agent-x@agents.aksademy.local']);         // akun agent
+    $ulang = pendingInvoice();                                                // checkout ulang lalu bayar
+    Invoice::create(['user_id' => $ulang->user_id, 'amount' => 850000, 'nett_amount' => 850000, 'status' => 'paid',
+        'invoice_code' => 'INV-'.Str::random(8), 'paid_at' => now()]);
+
+    $res = agentGet('/api/v1/agent/pending-invoices', piiToken())->assertOk();
+
+    expect($res->json('purchases'))->toHaveCount(1)
+        ->and($res->json('purchases.0'))->toMatchArray([
+            'invoice_code' => $inv->invoice_code, 'kind' => 'purchase', 'name' => 'Budi Santoso',
+            'whatsapp' => '6281234567890', 'products' => ['Kelas Excel Akuntansi'], 'amount' => 850000,
+            'overdue' => false, 'pay_url' => $inv->invoice_url,
+        ])
+        ->and($res->json('purchases.0'))->not->toHaveKey('installment_number');
+});
+
+it('pending-invoices: termin cicilan jatuh tempo ≤ due_days atau terlambat, produk dari invoice induk', function () {
+    $program = makeProgram(['title' => 'Sertifikasi Brevet AB']);
+    $buyer = User::factory()->create(['name' => 'Sari', 'phone_number' => '+62 857 1111 2222']);
+    $parent = Invoice::create(['user_id' => $buyer->id, 'amount' => 3000000, 'nett_amount' => 3000000,
+        'status' => 'installment_pending', 'invoice_code' => 'INV-P', 'is_installment' => true]);
+    EnrollmentCertificationProgram::create(['invoice_id' => $parent->id, 'certification_program_id' => $program->id, 'price' => 3000000]);
+    $term = fn (int $n, string $status, string $due) => Invoice::create(['user_id' => $buyer->id, 'amount' => 1000000,
+        'nett_amount' => 1000000, 'status' => $status, 'invoice_code' => "INV-T{$n}", 'is_installment' => true,
+        'parent_invoice_id' => $parent->id, 'installment_number' => $n, 'installment_due_date' => $due]);
+    $term(1, 'paid', '2026-10-01 00:00:00');
+    $term(2, 'pending', '2026-11-05 00:00:00');   // terlambat 4 hari
+    $term(3, 'pending', '2026-11-11 00:00:00');   // jatuh tempo 2 hari lagi
+    $term(4, 'pending', '2026-11-25 00:00:00');   // masih jauh
+
+    $res = agentGet('/api/v1/agent/pending-invoices?due_days=3', piiToken())->assertOk();
+
+    expect(collect($res->json('installments'))->pluck('invoice_code')->all())->toBe(['INV-T2', 'INV-T3'])
+        ->and($res->json('installments.0'))->toMatchArray([
+            'kind' => 'installment', 'installment_number' => 2, 'name' => 'Sari', 'whatsapp' => '6285711112222',
+            'products' => ['Sertifikasi Brevet AB'], 'amount' => 1000000, 'overdue' => true,
+        ])
+        ->and($res->json('installments.1.overdue'))->toBeFalse()
+        ->and($res->json('installments.0.pay_url'))->toContain('/invoice/');
+
+    agentGet('/api/v1/agent/pending-invoices?due_days=99', piiToken())->assertUnprocessable();
+});
+
+it('pending-invoices: nomor WA dinormalisasi, nomor tak masuk akal dikosongkan', function () {
+    $wa = fn ($p) => \App\Http\Controllers\Api\Agent\PendingInvoicesController::whatsapp($p);
+    expect($wa('0812-3456-7890'))->toBe('6281234567890')
+        ->and($wa('+62 812 3456 7890'))->toBe('6281234567890')
+        ->and($wa('81234567890'))->toBe('6281234567890')
+        ->and($wa('12345'))->toBeNull()
+        ->and($wa(null))->toBeNull();
+});
+
+it('agent:token --pii menambah ability agent:read-pii', function () {
+    Artisan::call('agent:token', ['agent' => 'finance', '--pii' => true]);
+
+    $user = User::where('email', 'agent-finance@agents.aksademy.local')->firstOrFail();
+    expect($user->tokens()->first()->abilities)->toBe(['agent:read', 'agent:read-pii']);
+});

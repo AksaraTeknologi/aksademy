@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Agent\CatalogSummaryController;
 use App\Http\Controllers\Api\Agent\FinancialMetricsController;
 use App\Http\Controllers\Api\Agent\MeetingLinkNeededController;
+use App\Http\Controllers\Api\Agent\PendingInvoicesController;
 use App\Http\Controllers\Api\Agent\ProductBriefController;
 use App\Http\Controllers\Api\Agent\RecordingsPendingController;
 use App\Http\Controllers\Api\Agent\RevenueSummaryController;
@@ -53,6 +54,11 @@ Route::prefix('v1/agent')
             Route::get('/product-brief', ProductBriefController::class)->name('product-brief');
             Route::get('/financial-metrics', FinancialMetricsController::class)->name('financial-metrics');
         });
+
+        // Data pribadi (nama & no. WA) — ability terpisah, hanya token Fina (agent:token finance --pii).
+        Route::get('/pending-invoices', PendingInvoicesController::class)
+            ->middleware('token.ability:agent:read-pii')
+            ->name('pending-invoices');
 
         Route::post('/update-meeting-link', UpdateMeetingLinkController::class)
             ->middleware('token.ability:agent:write-meeting')
