@@ -127,8 +127,8 @@ class BootcampController extends Controller
                 })
                 ->exists();
 
-            $isInstallmentCompleted = $activeInstallment && $activeInstallment['is_fully_paid'];
-            $hasAccess = $hasRegularPaid || $isInstallmentCompleted;
+            $hasInstallmentPaid = $activeInstallment && ($activeInstallment['paid_terms'] ?? 0) > 0 && !($activeInstallment['is_access_suspended'] ?? false);
+            $hasAccess = $hasRegularPaid || $hasInstallmentPaid;
 
             if (!$hasAccess && !$activeInstallment) {
                 $invoice = Invoice::where('user_id', $userId)

@@ -117,7 +117,7 @@ class CourseController extends Controller
             'course' => $course,
             'courseRating' => $courseRating,
             'certificate' => $certificate,
-            'certificateParticipant' => $certificateParticipant,
+            'certificateParticipant' => ($course->is_installment && !$course->isFullyPaid()) ? null : $certificateParticipant,
             'active_installment' => $activeInstallment,
         ]);
     }

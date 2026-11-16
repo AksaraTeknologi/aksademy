@@ -1301,6 +1301,7 @@ class InvoiceController extends Controller
                             'status' => 'paid',
                             'paid_at' => Carbon::now('Asia/Jakarta'),
                         ]);
+                        $this->addEnrollmentToCertificateParticipants($parentInvoice);
                         event(new \App\Events\TransactionPaid($parentInvoice));
                     }
                 }
@@ -1568,6 +1569,7 @@ class InvoiceController extends Controller
                     // Cek apakah semua termin lunas
                     if ($parentInvoice->isFullyPaid()) {
                         $parentInvoice->update(['status' => 'paid', 'paid_at' => Carbon::now('Asia/Jakarta')]);
+                        $this->addEnrollmentToCertificateParticipants($parentInvoice);
                         event(new \App\Events\TransactionPaid($parentInvoice));
                         $this->sendWhatsAppInstallmentComplete($parentInvoice, $invoice);
                     } else {
@@ -1860,6 +1862,7 @@ class InvoiceController extends Controller
                     // Cek apakah semua termin lunas
                     if ($parentInvoice->isFullyPaid()) {
                         $parentInvoice->update(['status' => 'paid', 'paid_at' => Carbon::now('Asia/Jakarta')]);
+                        $this->addEnrollmentToCertificateParticipants($parentInvoice);
                         event(new \App\Events\TransactionPaid($parentInvoice));
                         $this->sendWhatsAppInstallmentComplete($parentInvoice, $invoice);
                     } else {
@@ -1942,6 +1945,35 @@ class InvoiceController extends Controller
      * @param Invoice $invoice
      * @return void
      */
+    private function getPhoneNumberForInvoice(Invoice $invoice): ?string
+    {
+        $user = $invoice->user;
+        if (!$user) {
+            return null;
+        }
+
+        if (!empty($user->phone_number)) {
+            return $user->phone_number;
+        }
+
+        $invoice->loadMissing('certificationProgramItems');
+        if ($invoice->certificationProgramItems->count() > 0) {
+            $certItem = $invoice->certificationProgramItems->first();
+            if ($certItem) {
+                $scholarshipApp = CertificationProgramScholarshipApplication::where('certification_program_id', $certItem->certification_program_id)
+                    ->where('email', $user->email)
+                    ->latest()
+                    ->first();
+                if ($scholarshipApp && !empty($scholarshipApp->phone)) {
+                    $user->update(['phone_number' => $scholarshipApp->phone]);
+                    return $scholarshipApp->phone;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function sendWhatsAppNotification(Invoice $invoice)
     {
         try {
@@ -1958,18 +1990,21 @@ class InvoiceController extends Controller
             }
 
             if ($invoice->isInstallmentParent()) {
-                $this->sendWhatsAppInstallmentComplete($invoice);
+                if ($invoice->isFullyPaid()) {
+                    $this->sendWhatsAppInstallmentComplete($invoice);
+                }
                 return;
             }
 
             $user = $invoice->user;
+            $phoneNumberRaw = $this->getPhoneNumberForInvoice($invoice);
 
-            if (!$user->phone_number) {
-                Log::warning('User does not have phone number', ['user_id' => $user->id, 'invoice_code' => $invoice->invoice_code]);
+            if (!$phoneNumberRaw) {
+                Log::warning('User does not have phone number', ['user_id' => $invoice->user_id, 'invoice_code' => $invoice->invoice_code]);
                 return;
             }
 
-            $phoneNumber = $this->formatPhoneNumber($user->phone_number);
+            $phoneNumber = $this->formatPhoneNumber($phoneNumberRaw);
 
             // Coba kirim via WhatsApp Official Template terlebih dahulu jika diaktifkan
             $useTemplate = config('services.messara.use_template', env('WA_USE_TEMPLATE', true));
@@ -2266,7 +2301,8 @@ class InvoiceController extends Controller
         } elseif ($isCompleted) {
             $message .= "*Status Cicilan:*\n";
             $message .= "🎉 Status: *LUNAS (Semua {$totalTerms} termin selesai)*\n";
-            $message .= "🏆 Sertifikat program dapat diakses melalui profil Anda setelah menyelesaikan pembelajaran.\n\n";
+            $message .= "🏆 Akses & Unduh Sertifikat: {$profileUrl}\n";
+            $message .= "📚 Akses Materi Program: {$profileUrl}\n\n";
         }
 
         // 4. Cara Mengakses Materi
@@ -2428,12 +2464,12 @@ class InvoiceController extends Controller
     private function sendWhatsAppTermPaid(Invoice $childInvoice, Invoice $parentInvoice): void
     {
         try {
-            $user = $parentInvoice->user;
-            if (!$user?->phone_number) {
+            $phoneNumberRaw = $this->getPhoneNumberForInvoice($parentInvoice);
+            if (!$phoneNumberRaw) {
                 return;
             }
 
-            $phoneNumber = $this->formatPhoneNumber($user->phone_number);
+            $phoneNumber = $this->formatPhoneNumber($phoneNumberRaw);
             $message = $this->createWhatsAppInstallmentMessage($childInvoice, $parentInvoice, false);
 
             self::sendText([['phone' => $phoneNumber, 'message' => $message, 'isGroup' => 'false']]);
@@ -2448,8 +2484,8 @@ class InvoiceController extends Controller
     private function sendWhatsAppInstallmentComplete(Invoice $parentInvoice, ?Invoice $childInvoice = null): void
     {
         try {
-            $user = $parentInvoice->user;
-            if (!$user?->phone_number) {
+            $phoneNumberRaw = $this->getPhoneNumberForInvoice($parentInvoice);
+            if (!$phoneNumberRaw) {
                 return;
             }
 
@@ -2457,7 +2493,7 @@ class InvoiceController extends Controller
                 $childInvoice = $parentInvoice->installmentTerms()->orderByDesc('installment_number')->first() ?? $parentInvoice;
             }
 
-            $phoneNumber = $this->formatPhoneNumber($user->phone_number);
+            $phoneNumber = $this->formatPhoneNumber($phoneNumberRaw);
             $message = $this->createWhatsAppInstallmentMessage($childInvoice, $parentInvoice, true);
 
             self::sendText([['phone' => $phoneNumber, 'message' => $message, 'isGroup' => 'false']]);

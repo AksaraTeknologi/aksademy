@@ -123,16 +123,21 @@ class AdminController extends Controller
 
     private function getParticipantData()
     {
+        $validInvoiceCondition = function ($q) {
+            $q->where(function ($sq) {
+                $sq->whereIn('invoices.status', ['paid', 'completed'])
+                    ->orWhere('invoices.status', 'installment_pending');
+            })
+            ->whereNull('invoices.parent_invoice_id');
+        };
+
         $courseEnrollments = EnrollmentCourse::join('invoices', 'enrollment_courses.invoice_id', '=', 'invoices.id')
             ->select(
                 DB::raw('DATE(enrollment_courses.created_at) as date'),
                 DB::raw('COUNT(*) as count'),
                 DB::raw('"course" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->whereDate('enrollment_courses.created_at', '>=', now()->subDays(30))
             ->groupBy('date');
 
@@ -142,10 +147,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as count'),
                 DB::raw('"bootcamp" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->whereDate('enrollment_bootcamps.created_at', '>=', now()->subDays(30))
             ->groupBy('date');
 
@@ -155,10 +157,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as count'),
                 DB::raw('"webinar" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->whereDate('enrollment_webinars.created_at', '>=', now()->subDays(30))
             ->groupBy('date');
 
@@ -168,10 +167,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as count'),
                 DB::raw('"certification_program" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->whereDate('enrollment_certification_programs.created_at', '>=', now()->subDays(30))
             ->groupBy('date');
 
@@ -185,6 +181,14 @@ class AdminController extends Controller
 
     private function getPopularProducts()
     {
+        $validInvoiceCondition = function ($q) {
+            $q->where(function ($sq) {
+                $sq->whereIn('invoices.status', ['paid', 'completed'])
+                    ->orWhere('invoices.status', 'installment_pending');
+            })
+            ->whereNull('invoices.parent_invoice_id');
+        };
+
         $popularCourses = DB::table('enrollment_courses')
             ->join('invoices', 'enrollment_courses.invoice_id', '=', 'invoices.id')
             ->join('courses', 'enrollment_courses.course_id', '=', 'courses.id')
@@ -196,10 +200,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as enrollment_count'),
                 DB::raw('"course" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->groupBy('courses.id', 'courses.title', 'courses.thumbnail', 'courses.price')
             ->get();
 
@@ -214,10 +215,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as enrollment_count'),
                 DB::raw('"bootcamp" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->groupBy('bootcamps.id', 'bootcamps.title', 'bootcamps.thumbnail', 'bootcamps.price')
             ->get();
 
@@ -232,10 +230,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as enrollment_count'),
                 DB::raw('"webinar" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->groupBy('webinars.id', 'webinars.title', 'webinars.thumbnail', 'webinars.price')
             ->get();
 
@@ -250,10 +245,7 @@ class AdminController extends Controller
                 DB::raw('COUNT(*) as enrollment_count'),
                 DB::raw('"certification_program" as type')
             )
-            ->where(function ($q) {
-                $q->whereIn('invoices.status', ['paid', 'completed'])
-                    ->orWhere('invoices.status', 'installment_pending');
-            })
+            ->where($validInvoiceCondition)
             ->groupBy('certification_programs.id', 'certification_programs.title', 'certification_programs.thumbnail', 'certification_programs.price')
             ->get();
 
@@ -372,6 +364,7 @@ class AdminController extends Controller
                 $q->whereIn('invoices.status', ['paid', 'completed'])
                     ->orWhere('invoices.status', 'installment_pending');
             })
+            ->whereNull('invoices.parent_invoice_id')
             ->whereMonth('enrollment_courses.created_at', now()->month)
             ->whereYear('enrollment_courses.created_at', now()->year)->count() +
             EnrollmentBootcamp::join('invoices', 'enrollment_bootcamps.invoice_id', '=', 'invoices.id')
@@ -379,6 +372,7 @@ class AdminController extends Controller
                 $q->whereIn('invoices.status', ['paid', 'completed'])
                     ->orWhere('invoices.status', 'installment_pending');
             })
+            ->whereNull('invoices.parent_invoice_id')
             ->whereMonth('enrollment_bootcamps.created_at', now()->month)
             ->whereYear('enrollment_bootcamps.created_at', now()->year)->count() +
             EnrollmentWebinar::join('invoices', 'enrollment_webinars.invoice_id', '=', 'invoices.id')
@@ -386,6 +380,7 @@ class AdminController extends Controller
                 $q->whereIn('invoices.status', ['paid', 'completed'])
                     ->orWhere('invoices.status', 'installment_pending');
             })
+            ->whereNull('invoices.parent_invoice_id')
             ->whereMonth('enrollment_webinars.created_at', now()->month)
             ->whereYear('enrollment_webinars.created_at', now()->year)->count() +
             EnrollmentCertificationProgram::join('invoices', 'enrollment_certification_programs.invoice_id', '=', 'invoices.id')
@@ -393,6 +388,7 @@ class AdminController extends Controller
                 $q->whereIn('invoices.status', ['paid', 'completed'])
                     ->orWhere('invoices.status', 'installment_pending');
             })
+            ->whereNull('invoices.parent_invoice_id')
             ->whereMonth('enrollment_certification_programs.created_at', now()->month)
             ->whereYear('enrollment_certification_programs.created_at', now()->year)->count();
 
@@ -489,7 +485,8 @@ class AdminController extends Controller
         $previousMonthEnd = $currentMonthStart->copy()->subMonthNoOverflow()->endOfMonth();
 
         // Query dasar untuk earnings affiliate
-        $earningsQuery = AffiliateEarning::where('affiliate_user_id', $user->id);
+        $earningsQuery = AffiliateEarning::where('affiliate_user_id', $user->id)
+            ->where('status', 'approved');
 
         // Total commission (dengan filter jika ada)
         $totalCommissionQuery = clone $earningsQuery;
@@ -546,11 +543,13 @@ class AdminController extends Controller
             'daily_commission_change' => round($dailyCommissionChange, 1),
             'monthly_commission_change' => round($monthlyCommissionChange, 1),
             'total_referrals' => AffiliateEarning::where('affiliate_user_id', $user->id)
+                ->where('status', 'approved')
                 ->distinct('invoice_id')
                 ->count(),
             'conversion_rate' => 0, // Data klik belum ada, jadi kita set 0
             'total_clicks' => 0, // Data klik belum ada, jadi kita set 0
             'recent_referrals' => AffiliateEarning::where('affiliate_user_id', $user->id)
+                ->where('status', 'approved')
                 ->with([
                     'invoice.user',
                     'invoice.courseItems.course',
@@ -683,10 +682,19 @@ class AdminController extends Controller
         $totalUsers = User::role('user')->count();
         $newUsersLastWeek = User::role('user')->where('created_at', '>=', now()->subWeek())->count();
 
-        $courseEnrollmentsCount = EnrollmentCourse::whereHas('invoice', fn($q) => $q->where('status', 'paid'))->count();
-        $bootcampEnrollmentsCount = EnrollmentBootcamp::whereHas('invoice', fn($q) => $q->where('status', 'paid'))->count();
-        $webinarEnrollmentsCount = EnrollmentWebinar::whereHas('invoice', fn($q) => $q->where('status', 'paid'))->count();
-        $totalParticipants = $courseEnrollmentsCount + $bootcampEnrollmentsCount + $webinarEnrollmentsCount;
+        $validStaffInvoiceCondition = function ($q) {
+            $q->where(function ($sq) {
+                $sq->whereIn('status', ['paid', 'completed'])
+                    ->orWhere('status', 'installment_pending');
+            })->whereNull('parent_invoice_id');
+        };
+        $courseEnrollmentsCount = EnrollmentCourse::whereHas('invoice', $validStaffInvoiceCondition)->count();
+        $bootcampEnrollmentsCount = EnrollmentBootcamp::whereHas('invoice', $validStaffInvoiceCondition)->count();
+        $webinarEnrollmentsCount = EnrollmentWebinar::whereHas('invoice', $validStaffInvoiceCondition)->count();
+        $certEnrollmentsCount = class_exists(EnrollmentCertificationProgram::class)
+            ? EnrollmentCertificationProgram::whereHas('invoice', $validStaffInvoiceCondition)->count()
+            : 0;
+        $totalParticipants = $courseEnrollmentsCount + $bootcampEnrollmentsCount + $webinarEnrollmentsCount + $certEnrollmentsCount;
 
         // Group modules for quick navigation
         $allModules = StaffPermissionSeeder::getPermissionModules();

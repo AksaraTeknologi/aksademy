@@ -16,6 +16,7 @@ import CertificationProgramApplications from './show-applications';
 import CertificationProgramDetail from './show-details';
 import CertificationProgramRecordings from './show-recordings';
 import CertificationProgramTransaction from './show-transactions';
+import InstallmentConfig from '@/components/admin/installment-config';
 
 interface Schedule {
     id: string;
@@ -48,6 +49,9 @@ interface CertificationProgram {
     strikethrough_price: number;
     price: number;
     scholarship_price?: number;
+    installment_enabled?: boolean;
+    installment_terms?: any[];
+    installmentTerms?: any[];
     scholarship_flow?: string | null;
     registration_deadline?: string | null;
     socialization_registration_deadline?: string | null;
@@ -115,8 +119,14 @@ export default function ShowCertificationProgram({ program, applications, transa
     const typeLabel = program.type === 'scholarship' ? 'Beasiswa' : 'Reguler';
     const typeColor = program.type === 'scholarship' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
 
-    const approvedApplications = applications.filter((a) => a.status === 'approved');
-    const paidTransactionsCount = transactions.filter((t) => t.status === 'paid').length;
+    const approvedApplications = applications.filter(
+        (a) =>
+            a.status === 'approved' ||
+            a.status === 'paid' ||
+            a.status === 'installment' ||
+            !!(a as any).has_paid ||
+            !!(a as any).installment_status,
+    );
 
     const totalSchedules = (program.schedules?.length ?? 0) + (program.type === 'scholarship' ? (program.socializationSchedules?.length ?? 0) : 0);
     const uploadedRecordings =
@@ -148,7 +158,7 @@ export default function ShowCertificationProgram({ program, applications, transa
                                 <TabsTrigger value="transaksi">
                                     Transaksi
                                     {transactions.length > 0 && (
-                                        <span className="bg-primary/10 ml-1 rounded-full px-2 py-0.5 text-xs">{paidTransactionsCount}</span>
+                                        <span className="bg-primary/10 ml-1 rounded-full px-2 py-0.5 text-xs">{transactions.length}</span>
                                     )}
                                 </TabsTrigger>
                                 <TabsTrigger value="jadwal">
@@ -161,8 +171,18 @@ export default function ShowCertificationProgram({ program, applications, transa
                                 </TabsTrigger>
                             </TabsList>
 
-                            <TabsContent value="detail">
+                            <TabsContent value="detail" className="space-y-4">
                                 <CertificationProgramDetail program={program} />
+                                {canManageProgram && program.type !== 'scholarship' && (
+                                    <InstallmentConfig
+                                        productType="certification_program"
+                                        productId={program.id}
+                                        productPrice={program.price}
+                                        installmentEnabled={program.installment_enabled ?? false}
+                                        initialTerms={program.installment_terms || program.installmentTerms || []}
+                                        registrationDeadline={program.registration_deadline}
+                                    />
+                                )}
                             </TabsContent>
 
                             <TabsContent value="peserta">

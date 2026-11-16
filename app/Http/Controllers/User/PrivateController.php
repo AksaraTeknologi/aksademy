@@ -162,12 +162,12 @@ class PrivateController extends Controller
                 })
                 ->pluck('private_class_schedule_id');
 
-            $isInstallmentCompleted = $activeInstallment && $activeInstallment['is_fully_paid'];
-            if ($isInstallmentCompleted) {
-                $completedInstallmentScheduleIds = EnrollmentPrivate::whereIn('private_class_schedule_id', $scheduleIds)
+            $hasInstallmentPaid = $activeInstallment && ($activeInstallment['paid_terms'] ?? 0) > 0 && !($activeInstallment['is_access_suspended'] ?? false);
+            if ($hasInstallmentPaid) {
+                $paidInstallmentScheduleIds = EnrollmentPrivate::whereIn('private_class_schedule_id', $scheduleIds)
                     ->where('invoice_id', $activeInstallment['parent_invoice_id'])
                     ->pluck('private_class_schedule_id');
-                $ownedPaidIds = $ownedPaidIds->concat($completedInstallmentScheduleIds);
+                $ownedPaidIds = $ownedPaidIds->concat($paidInstallmentScheduleIds);
             }
 
             $ownedScheduleIds = $ownedPaidIds->unique()->values();

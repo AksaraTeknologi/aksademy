@@ -204,6 +204,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::redirect('learn', 'profile/my-courses');
     Route::redirect('learn/course', 'profile/my-courses');
+    Route::redirect('/profile/course/{course}', '/profile/my-courses/{course}');
     Route::get('/learn/course/{course:slug}', [CourseDetailController::class, 'index'])
         ->middleware('enrollment.check')
         ->name('learn.course.detail');
@@ -572,12 +573,14 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
     });
 
     // Installment Term admin routes
-    Route::post('products/{type}/{id}/installments/toggle', [InstallmentTermController::class, 'toggleEnabled'])->name('installments.toggle');
-    Route::post('installment-terms', [InstallmentTermController::class, 'store'])->name('installment-terms.store');
-    Route::put('installment-terms/{id}', [InstallmentTermController::class, 'update'])->name('installment-terms.update');
-    Route::delete('installment-terms/{id}', [InstallmentTermController::class, 'destroy'])->name('installment-terms.destroy');
-    Route::post('installments/{id}/send-reminder', [InstallmentController::class, 'sendReminder'])->name('installments.send-reminder');
-    Route::post('installments/{id}/update-due-date', [InstallmentController::class, 'updateDueDate'])->name('installments.update-due-date');
+    Route::middleware(['role_or_permission:admin|courses.manage'])->group(function () {
+        Route::post('products/{type}/{id}/installments/toggle', [InstallmentTermController::class, 'toggleEnabled'])->name('installments.toggle');
+        Route::post('installment-terms', [InstallmentTermController::class, 'store'])->name('installment-terms.store');
+        Route::put('installment-terms/{id}', [InstallmentTermController::class, 'update'])->name('installment-terms.update');
+        Route::delete('installment-terms/{id}', [InstallmentTermController::class, 'destroy'])->name('installment-terms.destroy');
+        Route::post('installments/{id}/send-reminder', [InstallmentController::class, 'sendReminder'])->name('installments.send-reminder');
+        Route::post('installments/{id}/update-due-date', [InstallmentController::class, 'updateDueDate'])->name('installments.update-due-date');
+    });
 });
 
 Route::post('/api/discount-codes/validate', [DiscountCodeController::class, 'validate'])->name('api.discount-codes.validate');

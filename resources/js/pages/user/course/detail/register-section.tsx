@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 interface Course {
     title: string;
+    slug?: string;
     thumbnail?: string | null;
     strikethrough_price: number;
     price: number;
@@ -26,7 +27,7 @@ export default function RegisterSection({ course }: { course: Course }) {
     const { t, i18n } = useTranslation('user');
     const totalLessons = course.modules?.reduce((total, module) => total + (module.lessons?.length || 0), 0) || 0;
 
-    const registrationUrl = course.registration_url;
+    const registrationUrl = course.slug ? `/course/${course.slug}/checkout` : course.registration_url;
     const buttonText = t('course.detail.joinNow');
     const warningMessage = null;
 

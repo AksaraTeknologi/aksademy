@@ -98,7 +98,7 @@ export default function InstallmentOptions({
         : totalAmount;
 
     const isTermOverdueCheck = (dueDateStr?: string | null) => {
-        if (!dueDateStr) return false;
+        if (!dueDateStr || productType === 'course') return false;
         try {
             const d = typeof dueDateStr === 'string' ? parseISO(dueDateStr) : new Date(dueDateStr);
             if (isNaN(d.getTime())) return false;
@@ -428,9 +428,13 @@ export default function InstallmentOptions({
                                         </p>
                                         <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                             <Clock className="h-3 w-3" />
-                                            {term.due_date
-                                                ? format(parseISO(term.due_date), 'dd MMMM yyyy', { locale: dateLocaleObj })
-                                                : '-'}
+                                            {productType === 'course'
+                                                ? (i === 0
+                                                    ? (i18n.language === 'en' ? 'Today (upon registration)' : 'Hari ini (saat pendaftaran)')
+                                                    : (i18n.language === 'en' ? `${i * 30} days after registration` : `${i * 30} hari setelah pendaftaran`))
+                                                : (term.due_date
+                                                    ? format(parseISO(term.due_date), 'dd MMMM yyyy', { locale: dateLocaleObj })
+                                                    : '-')}
                                         </p>
                                     </div>
                                 </div>
