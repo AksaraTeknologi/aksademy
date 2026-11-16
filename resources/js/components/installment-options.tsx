@@ -117,7 +117,7 @@ export default function InstallmentOptions({
 
         if (!auth?.user) {
             toast.error(t('installmentOptions.errors.loginRequiredToContinue'));
-            window.location.href = '/login';
+            window.location.href = `/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`;
             return;
         }
 
@@ -157,7 +157,7 @@ export default function InstallmentOptions({
 
         if (!auth?.user) {
             toast.error(t('installmentOptions.errors.loginRequiredToContinueInstallment'));
-            window.location.href = '/login';
+            window.location.href = `/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`;
             return;
         }
 

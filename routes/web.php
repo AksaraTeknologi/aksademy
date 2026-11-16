@@ -165,6 +165,8 @@ Route::middleware(['auth'])->group(function () {
     // Installment routes (tidak perlu verified — user baru harus bisa bayar)
     Route::post('/invoice/installment', [InstallmentController::class, 'store'])->name('installment.store');
     Route::post('/installment/{id}/pay', [InstallmentController::class, 'payTerm'])->name('installment.pay-term');
+
+    Route::get('/api/user/points', [App\Http\Controllers\ReferralController::class, 'getPoints'])->name('api.user.points');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -231,8 +233,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/course/{course}/rating', [CourseRatingController::class, 'store'])->name('course.rating.store');
 
     Route::get('/invoice/{id}/pdf', [InvoiceController::class, 'generatePDF'])->name('invoice.pdf')->middleware('auth');
-
-    Route::get('/api/user/points', [App\Http\Controllers\ReferralController::class, 'getPoints'])->name('api.user.points');
 });
 
 Route::post('/api/referral/validate', [App\Http\Controllers\ReferralController::class, 'validateCode'])->name('api.referral.validate');
@@ -257,6 +257,7 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
         Route::post('/courses/{course}/publish', [CourseController::class, 'publish'])->name('courses.publish');
         Route::post('/courses/{course}/archive', [CourseController::class, 'archive'])->name('courses.archive');
         Route::post('/courses/{course}/duplicate', [CourseController::class, 'duplicate'])->name('courses.duplicate');
+        Route::redirect('/courses/{course}/enrollments', '/admin/courses/{course}');
         Route::get('/courses/{course}/{quiz}', [QuizController::class, 'show'])->name('quizzes.show');
         Route::get('/courses/{course}/quizzes/{quiz}/questions/create', [QuestionController::class, 'create'])->name('questions.create');
         Route::get('/courses/{course}/quizzes/{quiz}/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
@@ -274,6 +275,7 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
     Route::middleware(['role_or_permission:admin|mentor|affiliate|courses.view'])->group(function () {
         Route::get('courses', [CourseController::class, 'index'])->name('courses.index');
         Route::get('courses/{course}', [CourseController::class, 'show'])->name('courses.show');
+        Route::redirect('courses/{course}/enrollments', '/admin/courses/{course}');
     });
 
     // Categories
@@ -390,6 +392,7 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
     Route::middleware(['role_or_permission:admin|affiliate|bootcamps.view'])->group(function () {
         Route::get('bootcamps', [BootcampController::class, 'index'])->name('bootcamps.index');
         Route::get('bootcamps/{bootcamp}', [BootcampController::class, 'show'])->name('bootcamps.show');
+        Route::redirect('bootcamps/{bootcamp}/participants', '/admin/bootcamps/{bootcamp}');
     });
 
     // Certification Programs
@@ -440,6 +443,7 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
     Route::middleware(['role_or_permission:admin|affiliate|webinars.view'])->group(function () {
         Route::get('webinars', [WebinarController::class, 'index'])->name('webinars.index');
         Route::get('webinars/{webinar}', [WebinarController::class, 'show'])->name('webinars.show');
+        Route::redirect('webinars/{webinar}/participants', '/admin/webinars/{webinar}');
     });
 
     // Privates

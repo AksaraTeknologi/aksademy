@@ -135,6 +135,10 @@ class CourseController extends Controller
                     ->whereHas('courseItems', function ($query) use ($course) {
                         $query->where('course_id', $course->id);
                     })
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    })
                     ->latest()
                     ->first();
 
