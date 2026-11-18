@@ -3,11 +3,12 @@ import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
-import LessonForm, { type TrackOption } from './lesson-form';
+import LessonForm, { type ModuleOption, type TrackOption } from './lesson-form';
 
 interface CodingLessonModel {
     id: number;
     coding_track_id: number;
+    coding_module_id: number | null;
     title: string;
     slug: string;
     content: string;
@@ -22,9 +23,10 @@ interface CodingLessonModel {
 interface AdminCodingLessonEditProps {
     lesson: CodingLessonModel;
     tracks: TrackOption[];
+    modules: ModuleOption[];
 }
 
-export default function AdminCodingLessonEdit({ lesson, tracks }: AdminCodingLessonEditProps) {
+export default function AdminCodingLessonEdit({ lesson, tracks, modules }: AdminCodingLessonEditProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'Manajemen Coding Playground',
@@ -60,9 +62,11 @@ export default function AdminCodingLessonEdit({ lesson, tracks }: AdminCodingLes
 
                 <LessonForm
                     tracks={tracks}
+                    modules={modules}
                     initialData={{
                         id: lesson.id,
                         coding_track_id: String(lesson.coding_track_id),
+                        coding_module_id: lesson.coding_module_id ? String(lesson.coding_module_id) : '',
                         title: lesson.title,
                         slug: lesson.slug,
                         content: lesson.content ?? '',

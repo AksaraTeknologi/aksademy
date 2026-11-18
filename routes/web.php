@@ -49,6 +49,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\InstallmentController;
 use App\Http\Controllers\Admin\CarouselAdminController;
 use App\Http\Controllers\Admin\CodingLessonController as AdminCodingLessonController;
+use App\Http\Controllers\Admin\CodingModuleController as AdminCodingModuleController;
 use App\Http\Controllers\Admin\CodingTrackController as AdminCodingTrackController;
 use App\Http\Controllers\Admin\InstallmentTermController;
 use App\Http\Controllers\WebinarController;
@@ -614,12 +615,17 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
         Route::middleware(['role_or_permission:admin|coding-playground.view|coding-playground.manage'])->group(function () {
             Route::get('/', fn () => redirect()->route('admin.coding-playground.tracks.index'))->name('index');
             Route::get('tracks', [AdminCodingTrackController::class, 'index'])->name('tracks.index');
+            Route::get('modules', [AdminCodingModuleController::class, 'index'])->name('modules.index');
             Route::get('lessons', [AdminCodingLessonController::class, 'index'])->name('lessons.index');
         });
 
         Route::middleware(['role_or_permission:admin|coding-playground.manage'])->group(function () {
             Route::resource('tracks', AdminCodingTrackController::class)->except(['index', 'show']);
             Route::patch('tracks/{track}/toggle-status', [AdminCodingTrackController::class, 'toggleStatus'])->name('tracks.toggle-status');
+
+            Route::post('modules/reorder', [AdminCodingModuleController::class, 'reorder'])->name('modules.reorder');
+            Route::resource('modules', AdminCodingModuleController::class)->except(['index', 'show']);
+            Route::patch('modules/{module}/toggle-status', [AdminCodingModuleController::class, 'toggleStatus'])->name('modules.toggle-status');
 
             Route::post('lessons/reorder', [AdminCodingLessonController::class, 'reorder'])->name('lessons.reorder');
             Route::resource('lessons', AdminCodingLessonController::class)->except(['index', 'show']);

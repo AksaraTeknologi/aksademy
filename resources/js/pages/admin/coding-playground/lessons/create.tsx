@@ -3,11 +3,13 @@ import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
-import LessonForm, { type TrackOption } from './lesson-form';
+import LessonForm, { type ModuleOption, type TrackOption } from './lesson-form';
 
 interface AdminCodingLessonCreateProps {
     tracks: TrackOption[];
+    modules: ModuleOption[];
     defaultTrackId: string;
+    defaultModuleId?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,7 +27,12 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function AdminCodingLessonCreate({ tracks, defaultTrackId }: AdminCodingLessonCreateProps) {
+export default function AdminCodingLessonCreate({
+    tracks,
+    modules,
+    defaultTrackId,
+    defaultModuleId = '',
+}: AdminCodingLessonCreateProps) {
     return (
         <AdminLayout breadcrumbs={breadcrumbs}>
             <Head title="Tambah Materi - Coding Playground" />
@@ -46,8 +53,10 @@ export default function AdminCodingLessonCreate({ tracks, defaultTrackId }: Admi
 
                 <LessonForm
                     tracks={tracks}
+                    modules={modules}
                     initialData={{
                         coding_track_id: defaultTrackId,
+                        coding_module_id: defaultModuleId,
                         title: '',
                         slug: '',
                         content: '',

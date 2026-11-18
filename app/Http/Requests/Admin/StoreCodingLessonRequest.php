@@ -28,6 +28,10 @@ class StoreCodingLessonRequest extends FormRequest
                 'is_active' => filter_var($this->input('is_active'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             ]);
         }
+
+        if ($this->input('coding_module_id') === '' || $this->input('coding_module_id') === 'none') {
+            $this->merge(['coding_module_id' => null]);
+        }
     }
 
     public function rules(): array
@@ -36,6 +40,11 @@ class StoreCodingLessonRequest extends FormRequest
 
         return [
             'coding_track_id' => ['required', 'integer', 'exists:coding_tracks,id'],
+            'coding_module_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('coding_modules', 'id')->where(fn ($query) => $query->where('coding_track_id', $trackId)),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'slug' => [
                 'required',

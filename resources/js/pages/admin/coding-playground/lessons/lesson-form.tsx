@@ -11,7 +11,7 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { Link, useForm } from '@inertiajs/react';
 import { Editor } from '@tinymce/tinymce-react';
 import { Code2, FileText, Save } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 
 const LazyCodeEditorTabs = lazy(() => import('@/components/coding-playground/code-editor-tabs'));
 
@@ -22,9 +22,17 @@ export interface TrackOption {
     is_active: boolean;
 }
 
+export interface ModuleOption {
+    id: number;
+    coding_track_id: number;
+    title: string;
+    is_active: boolean;
+}
+
 export type CodingLessonFormData = {
     id?: number;
     coding_track_id: string;
+    coding_module_id: string;
     title: string;
     slug: string;
     content: string;
@@ -38,6 +46,7 @@ export type CodingLessonFormData = {
 
 interface LessonFormProps {
     tracks: TrackOption[];
+    modules: ModuleOption[];
     initialData: CodingLessonFormData;
     submitUrl: string;
     method: 'post' | 'put';
@@ -53,16 +62,32 @@ function slugify(value: string): string {
         .replace(/-+/g, '-');
 }
 
-export default function LessonForm({ tracks, initialData, submitUrl, method, submitLabel }: LessonFormProps) {
+export default function LessonForm({ tracks, modules, initialData, submitUrl, method, submitLabel }: LessonFormProps) {
     const { appearance } = useAppearance();
     const [slugEdited, setSlugEdited] = useState(Boolean(initialData.id));
     const [activeCodeTab, setActiveCodeTab] = useState<EditorLanguage>('html');
 
     const { data, setData, post, put, processing, errors } = useForm<CodingLessonFormData>(initialData);
 
+    const filteredModules = useMemo(
+        () => modules.filter((mod) => String(mod.coding_track_id) === data.coding_track_id),
+        [modules, data.coding_track_id],
+    );
+
     const isDarkEditor =
         appearance === 'dark' ||
         (appearance === 'system' && typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+
+    const handleTrackChange = (nextTrackId: string) => {
+        const currentModValid = modules.some(
+            (mod) => String(mod.id) === data.coding_module_id && String(mod.coding_track_id) === nextTrackId,
+        );
+        setData((prev) => ({
+            ...prev,
+            coding_track_id: nextTrackId,
+            coding_module_id: currentModValid ? prev.coding_module_id : '',
+        }));
+    };
 
     const handleTitleChange = (value: string) => {
         setData((prev) => ({
@@ -92,13 +117,13 @@ export default function LessonForm({ tracks, initialData, submitUrl, method, sub
             <Card>
                 <CardHeader>
                     <CardTitle>Informasi Materi</CardTitle>
-                    <CardDescription>Pilih program, judul, slug, dan pengaturan publikasi materi.</CardDescription>
+                    <CardDescription>Pilih program, bab, judul, slug, dan pengaturan publikasi materi.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
                             <Label htmlFor="coding_track_id">Program</Label>
-                            <Select value={data.coding_track_id} onValueChange={(value) => setData('coding_track_id', value)}>
+                            <Select value={data.coding_track_id} onValueChange={handleTrackChange}>
                                 <SelectTrigger id="coding_track_id">
                                     <SelectValue placeholder="Pilih Program" />
                                 </SelectTrigger>
@@ -111,6 +136,27 @@ export default function LessonForm({ tracks, initialData, submitUrl, method, sub
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.coding_track_id} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="coding_module_id">Bab (Opsional)</Label>
+                            <Select
+                                value={data.coding_module_id || 'none'}
+                                onValueChange={(value) => setData('coding_module_id', value === 'none' ? '' : value)}
+                            >
+                                <SelectTrigger id="coding_module_id">
+                                    <SelectValue placeholder="Pilih Bab" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Tanpa Bab</SelectItem>
+                                    {filteredModules.map((mod) => (
+                                        <SelectItem key={mod.id} value={String(mod.id)}>
+                                            {mod.title} {!mod.is_active ? '(Draft)' : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.coding_module_id} />
                         </div>
 
                         <div className="space-y-2">

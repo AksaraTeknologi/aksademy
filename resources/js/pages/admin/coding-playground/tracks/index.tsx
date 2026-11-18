@@ -9,7 +9,7 @@ import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type PaginatedData } from '@/types/pagination';
 import { Head, Link, router } from '@inertiajs/react';
-import { BookOpen, Code2, Edit, Layers, Plus, Search, Trash2 } from 'lucide-react';
+import { BookOpen, Code2, Edit, FolderKanban, Layers, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -105,6 +105,12 @@ export default function AdminCodingTracksIndex({ tracks, filters, flash }: Admin
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" asChild>
+                            <Link href={route('admin.coding-playground.modules.index')}>
+                                <FolderKanban className="h-4 w-4" />
+                                <span>Kelola Bab</span>
+                            </Link>
+                        </Button>
                         <Button variant="outline" asChild>
                             <Link href={route('admin.coding-playground.lessons.index')}>
                                 <BookOpen className="h-4 w-4" />

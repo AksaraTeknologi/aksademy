@@ -10,8 +10,8 @@ import AdminLayout from '@/layouts/admin-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type PaginatedData } from '@/types/pagination';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowLeft, ArrowUp, Copy, Edit, ExternalLink, Plus, Search, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowLeft, ArrowUp, Copy, Edit, ExternalLink, FolderKanban, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface TrackOption {
@@ -21,21 +21,32 @@ interface TrackOption {
     is_active: boolean;
 }
 
+interface ModuleOption {
+    id: number;
+    coding_track_id: number;
+    title: string;
+    is_active: boolean;
+}
+
 interface CodingLessonRow {
     id: number;
     coding_track_id: number;
+    coding_module_id: number | null;
     title: string;
     slug: string;
     is_active: boolean;
     sort_order: number;
     track: TrackOption | null;
+    module: ModuleOption | null;
 }
 
 interface AdminLessonsIndexProps {
     lessons: PaginatedData<CodingLessonRow>;
     tracks: TrackOption[];
+    modules: ModuleOption[];
     filters: {
         track_id?: string;
+        module_id?: string;
         search?: string;
         per_page?: number;
     };
@@ -56,22 +67,29 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flash }: AdminLessonsIndexProps) {
+export default function AdminCodingLessonsIndex({ lessons, tracks, modules, filters, flash }: AdminLessonsIndexProps) {
     const { canManage } = usePermission();
     const canManagePlayground = canManage('coding-playground');
     const [search, setSearch] = useState(filters.search ?? '');
     const selectedTrackId = filters.track_id ?? '';
+    const selectedModuleId = filters.module_id ?? '';
+
+    const availableModules = useMemo(() => {
+        if (!selectedTrackId) return modules;
+        return modules.filter((m) => String(m.coding_track_id) === selectedTrackId);
+    }, [modules, selectedTrackId]);
 
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
         if (flash?.error) toast.error(flash.error);
     }, [flash]);
 
-    const applyFilters = (nextTrackId: string, nextSearch: string) => {
+    const applyFilters = (nextTrackId: string, nextModuleId: string, nextSearch: string) => {
         router.get(
             route('admin.coding-playground.lessons.index'),
             {
                 track_id: nextTrackId || undefined,
+                module_id: nextModuleId || undefined,
                 search: nextSearch || undefined,
             },
             { preserveState: true, replace: true },
@@ -80,7 +98,7 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        applyFilters(selectedTrackId, search);
+        applyFilters(selectedTrackId, selectedModuleId, search);
     };
 
     const handleToggleStatus = (lesson: CodingLessonRow) => {
@@ -117,7 +135,12 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
         const current = lessons.data[index];
         const target = lessons.data[targetIndex];
 
-        if (!current || !target || current.coding_track_id !== target.coding_track_id) {
+        if (
+            !current ||
+            !target ||
+            current.coding_track_id !== target.coding_track_id ||
+            current.coding_module_id !== target.coding_module_id
+        ) {
             return;
         }
 
@@ -125,8 +148,12 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
         reordered[index] = target;
         reordered[targetIndex] = current;
 
-        const sameTrackItems = reordered
-            .filter((item) => item.coding_track_id === current.coding_track_id)
+        const sameGroupItems = reordered
+            .filter(
+                (item) =>
+                    item.coding_track_id === current.coding_track_id &&
+                    item.coding_module_id === current.coding_module_id,
+            )
             .map((item, idx) => ({
                 id: item.id,
                 sort_order: idx + 1,
@@ -134,7 +161,7 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
 
         router.post(
             route('admin.coding-playground.lessons.reorder'),
-            { items: sameTrackItems },
+            { items: sameGroupItems },
             {
                 preserveScroll: true,
                 onSuccess: () => toast.success('Urutan materi disimpan.'),
@@ -159,29 +186,38 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                         </div>
                         <h1 className="text-2xl font-semibold">Materi Coding Playground</h1>
                         <p className="text-muted-foreground text-sm">
-                            Kelola materi, starter code HTML/CSS/JS, status publikasi, dan urutan materi.
+                            Kelola materi, pengelompokan bab, starter code HTML/CSS/JS, status publikasi, dan urutan materi.
                         </p>
                     </div>
 
-                    {canManagePlayground && (
-                        <Button asChild>
-                            <Link
-                                href={route('admin.coding-playground.lessons.create', {
-                                    track_id: selectedTrackId || undefined,
-                                })}
-                            >
-                                <Plus className="h-4 w-4" />
-                                <span>Tambah Materi</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" asChild>
+                            <Link href={route('admin.coding-playground.modules.index', { track_id: selectedTrackId || undefined })}>
+                                <FolderKanban className="h-4 w-4" />
+                                <span>Kelola Bab</span>
                             </Link>
                         </Button>
-                    )}
+                        {canManagePlayground && (
+                            <Button asChild>
+                                <Link
+                                    href={route('admin.coding-playground.lessons.create', {
+                                        track_id: selectedTrackId || undefined,
+                                        module_id: selectedModuleId && selectedModuleId !== 'none' ? selectedModuleId : undefined,
+                                    })}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Tambah Materi</span>
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="w-full sm:w-64">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <div className="w-full sm:w-56">
                         <Select
                             value={selectedTrackId || 'all'}
-                            onValueChange={(val) => applyFilters(val === 'all' ? '' : val, search)}
+                            onValueChange={(val) => applyFilters(val === 'all' ? '' : val, '', search)}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Semua Program" />
@@ -191,6 +227,26 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                                 {tracks.map((track) => (
                                     <SelectItem key={track.id} value={String(track.id)}>
                                         {track.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="w-full sm:w-56">
+                        <Select
+                            value={selectedModuleId || 'all'}
+                            onValueChange={(val) => applyFilters(selectedTrackId, val === 'all' ? '' : val, search)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Semua Bab" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Semua Bab</SelectItem>
+                                <SelectItem value="none">Tanpa Bab</SelectItem>
+                                {availableModules.map((mod) => (
+                                    <SelectItem key={mod.id} value={String(mod.id)}>
+                                        {mod.title}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -220,6 +276,7 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                                 <TableHead className="w-28">Urutan</TableHead>
                                 <TableHead>Judul Materi</TableHead>
                                 <TableHead>Program</TableHead>
+                                <TableHead>Bab</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Aksi</TableHead>
                             </TableRow>
@@ -227,7 +284,7 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                         <TableBody>
                             {lessons.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-muted-foreground h-28 text-center">
+                                    <TableCell colSpan={6} className="text-muted-foreground h-28 text-center">
                                         Belum ada materi Coding Playground.
                                     </TableCell>
                                 </TableRow>
@@ -236,11 +293,18 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                                     const canMoveUp =
                                         canManagePlayground &&
                                         idx > 0 &&
-                                        lessons.data[idx - 1]?.coding_track_id === lesson.coding_track_id;
+                                        lessons.data[idx - 1]?.coding_track_id === lesson.coding_track_id &&
+                                        lessons.data[idx - 1]?.coding_module_id === lesson.coding_module_id;
                                     const canMoveDown =
                                         canManagePlayground &&
                                         idx < lessons.data.length - 1 &&
-                                        lessons.data[idx + 1]?.coding_track_id === lesson.coding_track_id;
+                                        lessons.data[idx + 1]?.coding_track_id === lesson.coding_track_id &&
+                                        lessons.data[idx + 1]?.coding_module_id === lesson.coding_module_id;
+
+                                    const isPublic =
+                                        lesson.is_active &&
+                                        Boolean(lesson.track?.is_active) &&
+                                        (lesson.coding_module_id === null || Boolean(lesson.module?.is_active));
 
                                     return (
                                         <TableRow key={lesson.id}>
@@ -283,6 +347,13 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                                                 <Badge variant="outline">{lesson.track?.title ?? '-'}</Badge>
                                             </TableCell>
                                             <TableCell>
+                                                {lesson.module ? (
+                                                    <Badge variant="secondary">{lesson.module.title}</Badge>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">Tanpa Bab</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Switch
                                                         checked={lesson.is_active}
@@ -297,7 +368,7 @@ export default function AdminCodingLessonsIndex({ lessons, tracks, filters, flas
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {lesson.is_active && lesson.track?.is_active && (
+                                                    {isPublic && lesson.track && (
                                                         <Button variant="ghost" size="sm" asChild title="Buka halaman publik">
                                                             <a
                                                                 href={route('coding-playground.lesson', [
