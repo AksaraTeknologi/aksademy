@@ -170,3 +170,58 @@ it('agent brevet-classes: hanya batch berkode, peserta Aksademy, butuh agent:rea
         ->and($res->json('data.0.course_code'))->toBe('XHQwcrf4')
         ->and(collect($res->json('data.0.participants'))->pluck('email')->all())->toBe(['nabila@test.com']);
 });
+
+it('panel memutus hubungan otomatis bila kelas sudah dihapus di brevetlearning', function () {
+    $this->program->update(['brevetlearning_course_code' => 'HILANG01', 'brevetlearning_platform' => 'smartcounting-rwlqp']);
+    fakeBrevet();
+
+    $res = $this->actingAs($this->admin)->getJson(route('certification-programs.brevetlearning.status', $this->program))->assertOk();
+
+    expect($res->json('course_code'))->toBeNull()
+        ->and($res->json('notice'))->toContain('HILANG01')
+        ->and($res->json('error'))->toBeNull()
+        ->and($this->program->fresh()->brevetlearning_course_code)->toBeNull();
+});
+
+it('404 yang bukan jawaban brevetlearning tidak memutus hubungan', function () {
+    $this->program->update(['brevetlearning_course_code' => 'XHQwcrf4']);
+    Http::fake([
+        'brevet.test/api/v1/integration/platforms' => Http::response(['data' => []]),
+        'brevet.test/*' => Http::response('<html>Not Found</html>', 404),
+    ]);
+
+    $res = $this->actingAs($this->admin)->getJson(route('certification-programs.brevetlearning.status', $this->program))->assertOk();
+
+    expect($res->json('error'))->toContain('BREVETLEARNING_API_URL')
+        ->and($this->program->fresh()->brevetlearning_course_code)->toBe('XHQwcrf4');
+});
+
+it('prune-links memutus hanya kelas yang dihapus, dengan pengaman', function () {
+    $lain = $this->program->replicate()->fill(['slug' => 'brevet-'.Str::random(6), 'batch' => '43']);
+    $lain->save();
+    $this->program->update(['brevetlearning_course_code' => 'XHQwcrf4']);
+    $lain->update(['brevetlearning_course_code' => 'HILANG01']);
+    fakeBrevet();
+
+    $this->artisan('brevetlearning:prune-links --dry-run')->assertSuccessful();
+    expect($lain->fresh()->brevetlearning_course_code)->toBe('HILANG01');
+
+    $this->artisan('brevetlearning:prune-links')->assertSuccessful();
+    expect($lain->fresh()->brevetlearning_course_code)->toBeNull()
+        ->and($this->program->fresh()->brevetlearning_course_code)->toBe('XHQwcrf4');
+
+    // Semua kode hilang sekaligus (≥2) → tidak ada yang diputus.
+    $this->program->update(['brevetlearning_course_code' => 'HILANG02']);
+    $lain->update(['brevetlearning_course_code' => 'HILANG03']);
+    $this->artisan('brevetlearning:prune-links')->assertFailed();
+    expect($this->program->fresh()->brevetlearning_course_code)->toBe('HILANG02')
+        ->and($lain->fresh()->brevetlearning_course_code)->toBe('HILANG03');
+});
+
+it('prune-links batal total bila token ditolak', function () {
+    $this->program->update(['brevetlearning_course_code' => 'XHQwcrf4']);
+    Http::fake(['brevet.test/*' => Http::response(['message' => 'Unauthenticated.'], 401)]);
+
+    $this->artisan('brevetlearning:prune-links')->assertFailed();
+    expect($this->program->fresh()->brevetlearning_course_code)->toBe('XHQwcrf4');
+});

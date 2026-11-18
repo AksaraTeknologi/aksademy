@@ -24,6 +24,7 @@ export type BrevetStatus = {
     participants: BrevetParticipant[];
     summary: { eligible: number; in_class: number; missing: number };
     error: string | null;
+    notice?: string | null;
 };
 
 type SendResult = { summary: Record<string, number>; results: { email: string; status: string; message: string | null }[] } | null;
@@ -125,7 +126,7 @@ export default function BrevetlearningPanel({ programId, onStatus }: { programId
     if (hidden) return null;
 
     // Program non-Brevet tidak perlu panel: selama belum ada kode kelas, cukup satu tombol kecil.
-    if (status && !status.course_code && !expanded) {
+    if (status && !status.course_code && !status.notice && !expanded) {
         return status.configured ? (
             <div className="flex justify-end">
                 <Button variant="ghost" size="sm" className="text-muted-foreground h-8 gap-1.5 text-xs" onClick={() => setExpanded(true)}>
@@ -187,6 +188,12 @@ export default function BrevetlearningPanel({ programId, onStatus }: { programId
             {status?.error && (
                 <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {status.error}
+                </div>
+            )}
+
+            {status?.notice && (
+                <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {status.notice}
                 </div>
             )}
 
