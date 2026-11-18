@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Agent\BrevetClassesController;
 use App\Http\Controllers\Api\Agent\CatalogSummaryController;
 use App\Http\Controllers\Api\Agent\FinancialMetricsController;
 use App\Http\Controllers\Api\Agent\MeetingLinkNeededController;
@@ -60,6 +61,10 @@ Route::prefix('v1/agent')
         Route::get('/pending-invoices', PendingInvoicesController::class)
             ->middleware('token.ability:agent:read-pii')
             ->name('pending-invoices');
+        // Cava: batch yang terhubung ke kelas brevetlearning + peserta Aksademy (data pribadi).
+        Route::get('/brevet-classes', BrevetClassesController::class)
+            ->middleware('token.ability:agent:read-pii')
+            ->name('brevet-classes');
         // Rekonsiliasi DOKU (D3): memanggil API DOKU dari server ini → khusus token Fina, dibatasi 6/menit.
         Route::get('/payment-reconciliation', PaymentReconciliationController::class)
             ->middleware(['token.ability:agent:read-pii', 'throttle:6,1'])

@@ -17,7 +17,7 @@ use App\Models\PrivateClass;
 use App\Models\PrivateClassSchedule;
 use App\Models\ProductInstallmentTerm;
 use App\Models\Webinar;
-use App\Traits\MessaraTrait;
+use App\Traits\WhatsAppTrait;
 use Carbon\Carbon;
 use Haruncpi\LaravelIdGenerator\IdGenerator;
 use Illuminate\Http\Request;
@@ -31,7 +31,7 @@ use Inertia\Inertia;
 
 class InstallmentController extends Controller
 {
-    use MessaraTrait;
+    use WhatsAppTrait;
 
     public function __construct()
     {

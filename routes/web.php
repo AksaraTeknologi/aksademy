@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AffiliateController;
+use App\Http\Controllers\CertificationProgramBrevetController;
 use App\Http\Controllers\AffiliateEarningController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\BootcampController;
@@ -417,6 +418,9 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
         Route::post('/certification-programs/{program}/scholarship-applications/{application}/approve', [CertificationProgramController::class, 'approveScholarshipApplication'])->name('certification-programs.scholarship-applications.approve');
         Route::post('/certification-programs/{program}/scholarship-applications/{application}/reject', [CertificationProgramController::class, 'rejectScholarshipApplication'])->name('certification-programs.scholarship-applications.reject');
         Route::post('/certification-programs/{program}/duplicate', [CertificationProgramController::class, 'duplicate'])->name('certification-programs.duplicate');
+        Route::get('/certification-programs/{program}/brevetlearning', [CertificationProgramBrevetController::class, 'status'])->name('certification-programs.brevetlearning.status');
+        Route::post('/certification-programs/{program}/brevetlearning/link', [CertificationProgramBrevetController::class, 'link'])->name('certification-programs.brevetlearning.link');
+        Route::post('/certification-programs/{program}/brevetlearning/send', [CertificationProgramBrevetController::class, 'send'])->name('certification-programs.brevetlearning.send');
         Route::get('/biinsight-import/programs', [BiinsightImportController::class, 'getPrograms'])->name('admin.biinsight-import.programs');
     });
     Route::middleware(['role_or_permission:admin|affiliate|certification-programs.view'])->group(function () {

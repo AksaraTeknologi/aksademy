@@ -3,7 +3,7 @@
 Acuan saat memindahkan perubahan dari **aksademy** (sumber) ke 7 platform turunan.
 Semua repo ada di `~/Development/Project/<nama>` dan masing-masing punya repo git sendiri.
 
-Data di bawah adalah snapshot **13 Nov 2026**. Untuk angka terbaru, jalankan:
+Data di bawah adalah snapshot **13 Nov 2026** (WA gateway diperbarui 17 Nov 2026). Untuk angka terbaru, jalankan:
 
 ```bash
 scripts/platform-diff.sh                      # matriks semua file inti
@@ -23,7 +23,7 @@ Angka di matriks = jumlah baris **logika** yang berbeda (komentar dan format dia
 | Checkout & invoice | `InvoiceController` (checkout, callback, free enrollment), `Models/Invoice` (scope `paidPayments`, `purchasedByUser`, `accessibleForUser`) | `pages/user/checkout` |
 | Cicilan | `InstallmentController`, `Admin/InstallmentTermController`, command `CheckInstallmentOverdue` | `components/admin/Installment*` |
 | Payment gateway | `DokuService`, Xendit SDK di `InvoiceController` | — |
-| WA gateway | `MessaraTrait`, `WablasTrait`, `MessaraService`, env `DEFAULT_WA_GATEWAY` | — |
+| WA gateway | `Services/WhatsApp/*` (identik di semua platform), `WhatsAppTrait` untuk notifikasi, config `services.whatsapp`, env `DEFAULT_WA_GATEWAY` | — |
 | Afiliasi | `AffiliateController`, `AffiliateEarningController`, pencatatan komisi di `InvoiceController::recordAffiliateCommissionHelper` | `pages/admin/{affiliates,earnings}` |
 | Referral & poin | `ReferralService`, `RewardService`, `PointService`, `ReferralController` | `pages/user/profile` |
 | Sertifikat | `CertificateController`, `CertificatePdfService`, `CertificateDesign/Sign/Participant` | `pages/user/check-certificate.tsx` |
@@ -37,14 +37,25 @@ Angka di matriks = jumlah baris **logika** yang berbeda (komentar dan format dia
 
 | Platform | Prefix invoice | Warna `--primary` | Payment gateway | WA gateway | Kode afiliasi default |
 |---|---|---|---|---|---|
-| **aksademy** | `AKS-` | `#003285` | Doku + Xendit | Messara (+ Wablas) | `ATM2025` |
-| sekolah-pajak | `SPK-` | `#1B805B` | Midtrans + Tripay + Xendit | Wablas | `SPJ2025` |
-| talenta-edu | `TLT-` | `#1976D3` | Midtrans + Tripay + Xendit | Wablas | `TAL2025` |
-| skill-grow-new | `SKG-` | `#fccd22` | Doku + Xendit | Wablas | `SGW2025` |
-| smartcounting-new | `SCA-` | `#5ce2e5` | Doku + Tripay + Xendit | Wablas | `SAC2026` |
-| biinspira | `BRA-` | `#2152A7` | Doku + Tripay + Xendit | Wablas | `BIN2026` |
-| kompeten | `KMT-` | `#fca311` | Doku + Tripay + Xendit | Wablas | `KMP2025`, `AKS2025` |
-| levelupcounting | `LUC-` | `#0360ED` | Midtrans + Tripay + Manjo (QRIS/VA) + Xendit | Wablas | `LUC2025` |
+| **aksademy** | `AKS-` | `#003285` | Doku + Xendit | Messara | `ATM2025` |
+| sekolah-pajak | `SPK-` | `#1B805B` | Midtrans + Tripay + Xendit | Messara (CRM/chatbot tetap Wablas AI) | `SPJ2025` |
+| talenta-edu | `TLT-` | `#1976D3` | Midtrans + Tripay + Xendit | Messara | `TAL2025` |
+| skill-grow-new | `SKG-` | `#fccd22` | Doku + Xendit | Messara | `SGW2025` |
+| smartcounting-new | `SCA-` | `#5ce2e5` | Doku + Tripay + Xendit | Messara | `SAC2026` |
+| biinspira | `BRA-` | `#2152A7` | Doku + Tripay + Xendit | Wablas (default config) | `BIN2026` |
+| kompeten | `KMT-` | `#fca311` | Doku + Tripay + Xendit | Messara | `KMP2025`, `AKS2025` |
+| levelupcounting | `LUC-` | `#0360ED` | Midtrans + Tripay + Manjo (QRIS/VA) + Xendit | Messara | `LUC2025` |
+
+### WhatsApp gateway (disamakan 17 Nov 2026)
+
+Semua platform memakai modul yang sama:
+- `app/Services/WhatsApp/*` dan `app/Traits/WhatsAppTrait.php` **identik** di semua platform (zona hijau, salin apa adanya dari aksademy).
+- Pemanggil notifikasi memakai `use WhatsAppTrait;` lalu `self::sendText(...)` / `self::sendTemplate(...)`.
+- Config ada di blok `services.whatsapp` (identik, kecuali default `gateway`). Pindah gateway cukup ubah env `DEFAULT_WA_GATEWAY=messara|wablas` lalu `php artisan config:clear`.
+- Default `gateway`: `messara` di semua platform, kecuali biinspira (`wablas`).
+- `WablasTrait` / `MessaraService` hanya pembungkus untuk kirim langsung ke satu gateway tanpa melihat `DEFAULT_WA_GATEWAY`.
+- Pengecualian: sekolah-pajak `SendWhatsAppJob`, `WablasService`, CRM, dan chatbot tetap memakai Wablas device AI (`services.wablas`, env `*_WABLAS_AI`). Jangan dialihkan.
+- Test: `tests/Feature/WhatsAppGatewayTest.php` (versi platform turunan tanpa test `SendWhatsAppJob` aksademy).
 
 Prefix invoice dan kode afiliasi default ditulis langsung di kode (`'prefix' => 'AKS-'` 4 tempat; `affiliate_code` di `InvoiceController`). Saat menyalin kode, **ganti keduanya sesuai platform**.
 
