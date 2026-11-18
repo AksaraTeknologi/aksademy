@@ -25,7 +25,9 @@ use App\Models\PrivateClass;
 use App\Models\PrivateClassSchedule;
 use App\Models\User;
 use App\Models\Webinar;
-use App\Traits\MessaraTrait;
+use App\Services\WhatsApp\SendStatus;
+use App\Services\WhatsApp\WhatsApp;
+use App\Traits\WhatsAppTrait;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -41,7 +43,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class InvoiceController extends Controller
 {
-    use MessaraTrait;
+    use WhatsAppTrait;
 
     public function __construct()
     {
@@ -2025,7 +2027,7 @@ class InvoiceController extends Controller
             $phoneNumber = $this->formatPhoneNumber($phoneNumberRaw);
 
             // Coba kirim via WhatsApp Official Template terlebih dahulu jika diaktifkan
-            $useTemplate = config('services.messara.use_template', env('WA_USE_TEMPLATE', true));
+            $useTemplate = config('services.whatsapp.messara.use_template', true);
             if ($useTemplate) {
                 $templateSent = $this->sendWhatsAppInvoiceTemplate($invoice);
                 if ($templateSent) {
@@ -2878,7 +2880,7 @@ class InvoiceController extends Controller
                 $groupLink,
             ];
 
-            $templateName = config('services.messara.invoice_template_name', env('WA_INVOICE_TEMPLATE_NAME', 'invoice_pembayaran_berhasil'));
+            $templateName = config('services.whatsapp.messara.invoice_template_name', 'invoice_pembayaran_berhasil');
 
             $waData = [
                 [
@@ -2889,7 +2891,10 @@ class InvoiceController extends Controller
                 ]
             ];
 
-            return self::sendTemplate($waData);
+            // Hanya fallback ke teks bila template PASTI gagal. Hasil tidak pasti (timeout dsb.)
+            // dianggap terkirim agar peserta tidak menerima template + teks sekaligus.
+            // Gateway Wablas tidak mendukung template sehingga hasilnya Failed dan otomatis fallback ke teks.
+            return WhatsApp::sendTemplateResult($waData)->status !== SendStatus::Failed;
         } catch (\Exception $e) {
             Log::error('Failed to send WhatsApp template notification', [
                 'invoice_code' => $invoice->invoice_code,
@@ -2923,7 +2928,7 @@ class InvoiceController extends Controller
             $phoneNumber = $this->formatPhoneNumber($user->phone_number);
 
             // Coba kirim via WhatsApp Official Template terlebih dahulu jika diaktifkan
-            $useTemplate = config('services.messara.use_template', env('WA_USE_TEMPLATE', true));
+            $useTemplate = config('services.whatsapp.messara.use_template', true);
             if ($useTemplate) {
                 $templateSent = $this->sendWhatsAppInvoiceTemplate($invoice);
                 if ($templateSent) {

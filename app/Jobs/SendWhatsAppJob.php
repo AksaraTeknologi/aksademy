@@ -1,15 +1,19 @@
 <?php
 namespace App\Jobs;
 
-use App\Traits\MessaraTrait;
-use App\Traits\WablasTrait;
+use App\Services\WhatsApp\PhoneNumber;
+use App\Services\WhatsApp\WhatsApp;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
+/**
+ * Kirim WhatsApp lewat antrean memakai gateway aktif (DEFAULT_WA_GATEWAY).
+ */
 class SendWhatsAppJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -19,55 +23,38 @@ class SendWhatsAppJob implements ShouldQueue
 
     public function __construct(
         public string $phone,
-        public string $message
-    ) {}
+        public string $message,
+        public ?string $refId = null,
+    ) {
+        // ref_id tetap sama di setiap retry job, sehingga Messara tidak mengirim ulang pesan yang sudah terkirim.
+        $this->refId ??= (string) Str::uuid();
+    }
 
     public function handle(): void
     {
         Log::info("Memproses SendWhatsAppJob untuk {$this->phone}");
 
-        $gateway = config('services.default_wa_gateway', 'messara');
+        $result = WhatsApp::sendTextResult([[
+            'phone' => PhoneNumber::normalize($this->phone),
+            'message' => $this->message,
+            'isGroup' => 'false',
+            'ref_id' => $this->refId,
+        ]]);
 
-        $phone = preg_replace('/[^0-9]/', '', $this->phone);
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (!str_starts_with($phone, '62')) {
-            $phone = '62' . $phone;
+        if ($result->isSent()) {
+            return;
         }
 
-        $success = false;
+        $reasons = array_filter(array_merge([$result->reason], array_column($result->items, 'reason')));
+        $error = new \Exception("Gagal mengirim WhatsApp via {$result->gateway} ke {$this->phone} (".implode(', ', $reasons ?: [$result->status->value]).')');
 
-        try {
-            if ($gateway === 'messara') {
-                $success = MessaraTrait::sendText([
-                    [
-                        'phone' => $phone,
-                        'message' => $this->message,
-                        'isGroup' => 'false',
-                    ]
-                ]);
-            } elseif ($gateway === 'evolution') {
-                $service = app(\App\Services\EvolutionApiService::class);
-                $success = $service->send($this->phone, $this->message);
-            } else {
-                $success = WablasTrait::sendText([
-                    [
-                        'phone' => $phone,
-                        'message' => $this->message,
-                        'isGroup' => 'false',
-                    ]
-                ]);
-            }
-        } catch (\Exception $e) {
-            if ($e->getMessage() === 'DAILY_LIMIT_REACHED') {
-                $this->fail($e);
-                return;
-            }
-            throw $e;
+        // Kuota harian habis atau kredensial kosong: retry tidak akan membantu.
+        if (array_intersect($reasons, ['daily_limit_reached', 'missing_credentials'])) {
+            $this->fail($error);
+
+            return;
         }
 
-        if (!$success) {
-            throw new \Exception("Gagal mengirim WhatsApp via {$gateway} ke {$this->phone}");
-        }
+        throw $error;
     }
 }
