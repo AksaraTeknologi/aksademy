@@ -57,6 +57,8 @@ interface TrackSummary {
 interface LessonDetail {
     id: number;
     coding_track_id: number;
+    coding_module_id: number | null;
+    module_title: string | null;
     title: string;
     slug: string;
     content: string;
@@ -70,9 +72,18 @@ interface LessonDetail {
 interface LessonNavItem {
     id: number;
     coding_track_id: number;
+    coding_module_id?: number | null;
     title: string;
     slug: string;
     sort_order: number;
+}
+
+interface ModuleGroupNav {
+    id: number | null;
+    title: string;
+    description: string | null;
+    sort_order: number;
+    lessons: LessonNavItem[];
 }
 
 interface LessonSummaryLink {
@@ -84,6 +95,7 @@ interface LessonSummaryLink {
 interface LessonWorkspaceProps {
     track: TrackSummary;
     lesson: LessonDetail;
+    modules?: ModuleGroupNav[];
     lessons: LessonNavItem[];
     previousLesson: LessonSummaryLink | null;
     nextLesson: LessonSummaryLink | null;
@@ -95,6 +107,7 @@ type MobileSection = 'materi' | 'editor' | 'output';
 export default function CodingPlaygroundLesson({
     track,
     lesson,
+    modules = [],
     lessons,
     previousLesson,
     nextLesson,
@@ -296,49 +309,78 @@ export default function CodingPlaygroundLesson({
         appearance === 'dark' ||
         (appearance === 'system' && typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
-    const lessonListPanel = (
-        <div className="space-y-1.5 py-2">
-            {lessons.map((item, idx) => {
-                const completed = completedSet.has(item.id);
-                const isCurrent = item.id === lesson.id;
-                const itemUrl = route('coding-playground.lesson', [track.slug, item.slug]);
-                return (
-                    <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => navigateWithGuard(itemUrl)}
-                        className={cn(
-                            'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
-                            isCurrent
-                                ? 'border-primary bg-primary/10 text-primary font-semibold'
-                                : 'border-transparent hover:bg-muted',
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                                completed
-                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                                    : isCurrent
-                                      ? 'bg-primary text-primary-foreground'
-                                      : 'bg-muted text-muted-foreground',
+    const lessonListPanel = (() => {
+        const groups: ModuleGroupNav[] =
+            modules.length > 0
+                ? modules
+                : [{ id: null, title: 'Daftar Materi', description: null, sort_order: 0, lessons }];
+        const showGroupHeaders = modules.some((m) => m.id !== null);
+        let counter = 0;
+
+        return (
+            <div className="space-y-4 py-2">
+                {groups.map((group, gIdx) => {
+                    if (group.lessons.length === 0) return null;
+                    return (
+                        <div key={group.id ?? `group-${gIdx}`} className="space-y-1.5">
+                            {showGroupHeaders && (
+                                <div className="text-muted-foreground px-1 text-xs font-semibold tracking-wide uppercase">
+                                    {group.title}
+                                </div>
                             )}
-                        >
-                            {completed ? <CheckCircle2 className="h-3.5 w-3.5" /> : idx + 1}
-                        </span>
-                        <span className="line-clamp-2 flex-1">{item.title}</span>
-                    </button>
-                );
-            })}
-        </div>
-    );
+                            {group.lessons.map((item) => {
+                                counter += 1;
+                                const completed = completedSet.has(item.id);
+                                const isCurrent = item.id === lesson.id;
+                                const itemUrl = route('coding-playground.lesson', [track.slug, item.slug]);
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => navigateWithGuard(itemUrl)}
+                                        className={cn(
+                                            'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
+                                            isCurrent
+                                                ? 'border-primary bg-primary/10 text-primary font-semibold'
+                                                : 'border-transparent hover:bg-muted',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                                                completed
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                                    : isCurrent
+                                                      ? 'bg-primary text-primary-foreground'
+                                                      : 'bg-muted text-muted-foreground',
+                                            )}
+                                        >
+                                            {completed ? <CheckCircle2 className="h-3.5 w-3.5" /> : counter}
+                                        </span>
+                                        <span className="line-clamp-2 flex-1">{item.title}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    })();
 
     const materialPanelContent = (
         <div className="flex h-full flex-col overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <Badge variant="secondary" className="font-medium">
-                    {track.title}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="secondary" className="font-medium">
+                        {track.title}
+                    </Badge>
+                    {lesson.module_title && (
+                        <Badge variant="outline" className="font-medium">
+                            {lesson.module_title}
+                        </Badge>
+                    )}
+                </div>
                 <span className="text-muted-foreground text-xs font-medium">
                     Progres: {progress.completed}/{progress.total} ({progress.percentage}%)
                 </span>

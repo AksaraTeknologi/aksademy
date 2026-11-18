@@ -6,7 +6,7 @@ import UserLayout from '@/layouts/user-layout';
 import { calculateProgressStats, getGuestCompletedLessonIds } from '@/lib/coding-playground-progress';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Circle, Code2, Layers, PlayCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Circle, Code2, FolderKanban, Layers, PlayCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface CodingTrackDetail {
@@ -21,14 +21,24 @@ interface CodingTrackDetail {
 interface CodingLessonSummary {
     id: number;
     coding_track_id: number;
+    coding_module_id: number | null;
     title: string;
     slug: string;
-    instructions: string | null;
+    instructions?: string | null;
     sort_order: number;
+}
+
+interface CodingModuleGroup {
+    id: number | null;
+    title: string;
+    description: string | null;
+    sort_order: number;
+    lessons: CodingLessonSummary[];
 }
 
 interface TrackDetailProps {
     track: CodingTrackDetail;
+    modules: CodingModuleGroup[];
     lessons: CodingLessonSummary[];
     completedLessonIds: number[];
 }
@@ -39,7 +49,7 @@ const LEVEL_LABELS: Record<string, string> = {
     advanced: 'Mahir',
 };
 
-export default function CodingPlaygroundTrack({ track, lessons, completedLessonIds }: TrackDetailProps) {
+export default function CodingPlaygroundTrack({ track, modules, lessons, completedLessonIds }: TrackDetailProps) {
     const { auth } = usePage<SharedData>().props;
     const isAuthenticated = Boolean(auth?.user);
 
@@ -74,6 +84,9 @@ export default function CodingPlaygroundTrack({ track, lessons, completedLessonI
     const firstLesson = lessons[0] ?? null;
     const nextIncompleteLesson = lessons.find((lesson) => !completedSet.has(lesson.id)) ?? firstLesson;
     const hasProgress = progress.completed > 0;
+    const hasChapters = modules.some((mod) => mod.id !== null);
+
+    let globalLessonCounter = 0;
 
     return (
         <UserLayout>
@@ -112,6 +125,12 @@ export default function CodingPlaygroundTrack({ track, lessons, completedLessonI
                                     <Badge variant="secondary">
                                         Level: {LEVEL_LABELS[track.level] ?? track.level}
                                     </Badge>
+                                    {hasChapters && (
+                                        <Badge variant="outline" className="gap-1">
+                                            <FolderKanban className="h-3.5 w-3.5" />
+                                            <span>{modules.filter((m) => m.id !== null).length} Bab</span>
+                                        </Badge>
+                                    )}
                                     <Badge variant="outline" className="gap-1">
                                         <Layers className="h-3.5 w-3.5" />
                                         <span>{lessons.length} Materi</span>
@@ -155,75 +174,113 @@ export default function CodingPlaygroundTrack({ track, lessons, completedLessonI
                     </div>
                 </Card>
 
-                {/* Lessons List */}
+                {/* Chapters & Lessons List */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-xl">
                             <BookOpen className="text-primary h-5 w-5" />
-                            <span>Daftar Materi</span>
+                            <span>{hasChapters ? 'Kurikulum Bab & Materi' : 'Daftar Materi'}</span>
                         </CardTitle>
                         <CardDescription>
-                            Materi disusun berurutan dari dasar hingga latihan interaktif.
+                            Materi disusun berurutan per bab dari dasar hingga latihan interaktif.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-6">
                         {lessons.length === 0 ? (
                             <div className="text-muted-foreground rounded-lg border border-dashed py-12 text-center text-sm">
                                 Belum ada materi yang dipublikasikan untuk program ini.
                             </div>
                         ) : (
-                            <div className="divide-border divide-y rounded-lg border">
-                                {lessons.map((lesson, index) => {
-                                    const isCompleted = completedSet.has(lesson.id);
-                                    return (
-                                        <Link
-                                            key={lesson.id}
-                                            href={route('coding-playground.lesson', [track.slug, lesson.slug])}
-                                            className="hover:bg-muted/50 flex flex-col justify-between gap-3 p-4 transition-colors sm:flex-row sm:items-center"
-                                        >
-                                            <div className="flex items-start gap-3 sm:items-center">
-                                                <div
-                                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                                                        isCompleted
-                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                                                            : 'bg-primary/10 text-primary'
-                                                    }`}
-                                                >
-                                                    {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <h3 className="text-foreground font-medium">{lesson.title}</h3>
-                                                    {lesson.instructions && (
-                                                        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
-                                                            Latihan: {lesson.instructions}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
+                            modules.map((modGroup, modIdx) => {
+                                if (modGroup.lessons.length === 0 && modGroup.id === null) {
+                                    return null;
+                                }
 
-                                            <div className="flex items-center justify-between gap-3 pl-11 sm:justify-end sm:pl-0">
-                                                {isCompleted ? (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                                    >
-                                                        Selesai
+                                const modCompletedCount = modGroup.lessons.filter((l) => completedSet.has(l.id)).length;
+
+                                return (
+                                    <div key={modGroup.id ?? `ungrouped-${modIdx}`} className="overflow-hidden rounded-xl border">
+                                        {(hasChapters || modGroup.id !== null) && (
+                                            <div className="bg-muted/40 border-b px-4 py-3 sm:px-5">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <FolderKanban className="text-primary h-4 w-4 shrink-0" />
+                                                        <h2 className="text-foreground text-base font-semibold">{modGroup.title}</h2>
+                                                    </div>
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {modCompletedCount} / {modGroup.lessons.length} selesai
                                                     </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-muted-foreground gap-1">
-                                                        <Circle className="h-3 w-3" />
-                                                        <span>Belum Selesai</span>
-                                                    </Badge>
+                                                </div>
+                                                {modGroup.description && (
+                                                    <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+                                                        {modGroup.description}
+                                                    </p>
                                                 )}
-                                                <span className="text-primary inline-flex items-center gap-1 text-xs font-semibold">
-                                                    <span>Buka</span>
-                                                    <ArrowRight className="h-3.5 w-3.5" />
-                                                </span>
                                             </div>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
+                                        )}
+
+                                        {modGroup.lessons.length === 0 ? (
+                                            <div className="text-muted-foreground px-4 py-6 text-center text-xs">
+                                                Belum ada materi pada bab ini.
+                                            </div>
+                                        ) : (
+                                            <div className="divide-border divide-y">
+                                                {modGroup.lessons.map((lesson) => {
+                                                    globalLessonCounter += 1;
+                                                    const isCompleted = completedSet.has(lesson.id);
+                                                    return (
+                                                        <Link
+                                                            key={lesson.id}
+                                                            href={route('coding-playground.lesson', [track.slug, lesson.slug])}
+                                                            className="hover:bg-muted/50 flex flex-col justify-between gap-3 p-4 transition-colors sm:flex-row sm:items-center"
+                                                        >
+                                                            <div className="flex items-start gap-3 sm:items-center">
+                                                                <div
+                                                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                                                        isCompleted
+                                                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                                                            : 'bg-primary/10 text-primary'
+                                                                    }`}
+                                                                >
+                                                                    {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : globalLessonCounter}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <h3 className="text-foreground font-medium">{lesson.title}</h3>
+                                                                    {lesson.instructions && (
+                                                                        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
+                                                                            Latihan: {lesson.instructions}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between gap-3 pl-11 sm:justify-end sm:pl-0">
+                                                                {isCompleted ? (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                                                    >
+                                                                        Selesai
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <Badge variant="outline" className="text-muted-foreground gap-1">
+                                                                        <Circle className="h-3 w-3" />
+                                                                        <span>Belum Selesai</span>
+                                                                    </Badge>
+                                                                )}
+                                                                <span className="text-primary inline-flex items-center gap-1 text-xs font-semibold">
+                                                                    <span>Buka</span>
+                                                                    <ArrowRight className="h-3.5 w-3.5" />
+                                                                </span>
+                                                            </div>
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
                         )}
                     </CardContent>
                 </Card>

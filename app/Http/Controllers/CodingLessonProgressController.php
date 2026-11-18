@@ -13,8 +13,10 @@ class CodingLessonProgressController extends Controller
 {
     public function store(Request $request, CodingTrack $track, CodingLesson $lesson): JsonResponse|RedirectResponse
     {
+        $lesson->loadMissing('module:id,is_active');
+
         abort_unless(
-            $track->is_active && $lesson->is_active && (int) $lesson->coding_track_id === (int) $track->id,
+            $track->is_active && (int) $lesson->coding_track_id === (int) $track->id && $lesson->isPubliclyAccessible(),
             404
         );
 
@@ -43,8 +45,10 @@ class CodingLessonProgressController extends Controller
 
     public function destroy(Request $request, CodingTrack $track, CodingLesson $lesson): JsonResponse|RedirectResponse
     {
+        $lesson->loadMissing('module:id,is_active');
+
         abort_unless(
-            $track->is_active && $lesson->is_active && (int) $lesson->coding_track_id === (int) $track->id,
+            $track->is_active && (int) $lesson->coding_track_id === (int) $track->id && $lesson->isPubliclyAccessible(),
             404
         );
 

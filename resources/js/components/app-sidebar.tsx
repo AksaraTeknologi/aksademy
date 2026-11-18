@@ -114,6 +114,13 @@ const allNavItems: NavItem[] = [
                 activeUrls: ['/admin/coding-playground/tracks'],
             },
             {
+                title: 'Bab',
+                href: '/admin/coding-playground/modules',
+                roles: ['admin', 'staff'],
+                permissionKey: 'coding-playground',
+                activeUrls: ['/admin/coding-playground/modules'],
+            },
+            {
                 title: 'Materi',
                 href: '/admin/coding-playground/lessons',
                 roles: ['admin', 'staff'],

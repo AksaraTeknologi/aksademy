@@ -31,6 +31,18 @@ class CodingTrack extends Model
         ];
     }
 
+    public function modules(): HasMany
+    {
+        return $this->hasMany(CodingModule::class, 'coding_track_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function activeModules(): HasMany
+    {
+        return $this->modules()->where('is_active', true);
+    }
+
     public function lessons(): HasMany
     {
         return $this->hasMany(CodingLesson::class, 'coding_track_id')
@@ -40,7 +52,12 @@ class CodingTrack extends Model
 
     public function activeLessons(): HasMany
     {
-        return $this->lessons()->where('is_active', true);
+        return $this->lessons()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->whereNull('coding_module_id')
+                    ->orWhereHas('module', fn ($moduleQuery) => $moduleQuery->where('is_active', true));
+            });
     }
 
     public function scopeActive(Builder $query): Builder

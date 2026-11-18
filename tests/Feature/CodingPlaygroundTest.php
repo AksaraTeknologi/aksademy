@@ -470,6 +470,138 @@ it('enforces role and permission matrix across mentor, affiliate, staff view, st
     \Illuminate\Support\Facades\DB::disableQueryLog();
 
     expect($indexQueries)->toBeLessThanOrEqual(2);
-    expect($trackQueries)->toBeLessThanOrEqual(3);
-    expect($lessonQueries)->toBeLessThanOrEqual(4);
+    expect($trackQueries)->toBeLessThanOrEqual(4);
+    expect($lessonQueries)->toBeLessThanOrEqual(5);
+});
+
+it('supports chapters (coding_modules) CRUD, track scoping, cross-chapter navigation, draft hiding, and nullOnDelete', function () {
+    $admin = createAdminUser();
+    $user = createRegularUser();
+
+    $track = CodingTrack::create([
+        'title' => 'HTML Terstruktur',
+        'slug' => 'html-terstruktur',
+        'level' => 'beginner',
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
+
+    $otherTrack = CodingTrack::create([
+        'title' => 'Track Lain',
+        'slug' => 'track-lain',
+        'level' => 'beginner',
+        'is_active' => true,
+        'sort_order' => 2,
+    ]);
+
+    // Admin creates Bab 1 and Bab 2
+    $this->actingAs($admin)
+        ->post(route('admin.coding-playground.modules.store'), [
+            'coding_track_id' => $track->id,
+            'title' => 'Bab 1: Dasar HTML',
+            'description' => 'Pengenalan struktur HTML',
+            'is_active' => true,
+            'sort_order' => 1,
+        ])
+        ->assertRedirect(route('admin.coding-playground.modules.index', ['track_id' => $track->id]));
+
+    $this->actingAs($admin)
+        ->post(route('admin.coding-playground.modules.store'), [
+            'coding_track_id' => $track->id,
+            'title' => 'Bab 2: Elemen Lanjut',
+            'is_active' => true,
+            'sort_order' => 2,
+        ])
+        ->assertRedirect();
+
+    $bab1 = \App\Models\CodingModule::where('title', 'Bab 1: Dasar HTML')->firstOrFail();
+    $bab2 = \App\Models\CodingModule::where('title', 'Bab 2: Elemen Lanjut')->firstOrFail();
+
+    // Validation: cannot assign Bab from $track to a lesson in $otherTrack
+    $this->actingAs($admin)
+        ->post(route('admin.coding-playground.lessons.store'), [
+            'coding_track_id' => $otherTrack->id,
+            'coding_module_id' => $bab1->id,
+            'title' => 'Salah Track',
+            'slug' => 'salah-track',
+            'content' => '<p>Test</p>',
+        ])
+        ->assertSessionHasErrors(['coding_module_id']);
+
+    // Create lessons inside Bab 1 and Bab 2
+    $l1 = CodingLesson::create([
+        'coding_track_id' => $track->id,
+        'coding_module_id' => $bab1->id,
+        'title' => 'Materi 1.1',
+        'slug' => 'materi-1-1',
+        'content' => '<p>1.1</p>',
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
+
+    $l2 = CodingLesson::create([
+        'coding_track_id' => $track->id,
+        'coding_module_id' => $bab2->id,
+        'title' => 'Materi 2.1',
+        'slug' => 'materi-2-1',
+        'content' => '<p>2.1</p>',
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
+
+    // Public track detail groups lessons under modules
+    $this->get(route('coding-playground.track', $track->slug))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('modules', 2)
+            ->where('modules.0.title', 'Bab 1: Dasar HTML')
+            ->where('modules.1.title', 'Bab 2: Elemen Lanjut')
+            ->has('lessons', 2)
+        );
+
+    // Cross-chapter next/previous navigation: Materi 1.1 -> Materi 2.1
+    $this->get(route('coding-playground.lesson', [$track->slug, $l1->slug]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('lesson.module_title', 'Bab 1: Dasar HTML')
+            ->where('nextLesson.slug', 'materi-2-1')
+        );
+
+    // Deactivating Bab 2 hides Materi 2.1 publicly & blocks progress endpoint
+    $this->actingAs($admin)
+        ->patch(route('admin.coding-playground.modules.toggle-status', $bab2->id))
+        ->assertRedirect();
+
+    $this->get(route('coding-playground.lesson', [$track->slug, $l2->slug]))->assertNotFound();
+    $this->actingAs($user)
+        ->post(route('coding-playground.lesson.complete', [$track->slug, $l2->slug]))
+        ->assertNotFound();
+
+    // Index active_lessons_count should only count 1 (Materi 1.1)
+    $this->get(route('coding-playground.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('tracks.0.active_lessons_count', 1)
+        );
+
+    // Reorder modules: Bab 2 -> 1, Bab 1 -> 2
+    $this->actingAs($admin)
+        ->post(route('admin.coding-playground.modules.reorder'), [
+            'items' => [
+                ['id' => $bab2->id, 'sort_order' => 1],
+                ['id' => $bab1->id, 'sort_order' => 2],
+            ],
+        ])
+        ->assertRedirect();
+
+    expect($bab2->fresh()->sort_order)->toBe(1);
+
+    // Deleting Bab 1 preserves Materi 1.1 with coding_module_id = null (nullOnDelete)
+    $this->actingAs($admin)
+        ->delete(route('admin.coding-playground.modules.destroy', $bab1->id))
+        ->assertRedirect();
+
+    expect(\App\Models\CodingModule::find($bab1->id))->toBeNull();
+    expect($l1->fresh())->not->toBeNull();
+    expect($l1->fresh()->coding_module_id)->toBeNull();
 });

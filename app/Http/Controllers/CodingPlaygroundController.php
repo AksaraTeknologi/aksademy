@@ -7,6 +7,7 @@ use App\Models\CodingLessonProgress;
 use App\Models\CodingTrack;
 use App\Services\HtmlContentSanitizer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,15 +38,7 @@ class CodingPlaygroundController extends Controller
     {
         abort_unless($track->is_active, 404);
 
-        $lessons = $track->activeLessons()
-            ->get([
-                'id',
-                'coding_track_id',
-                'title',
-                'slug',
-                'instructions',
-                'sort_order',
-            ]);
+        ['modules' => $modules, 'lessons' => $lessons] = $this->getOrderedCurriculum($track, includeInstructions: true);
 
         $completedLessonIds = [];
         if ($request->user()) {
@@ -68,7 +61,8 @@ class CodingPlaygroundController extends Controller
                 'thumbnail' => $track->thumbnail,
                 'level' => $track->level,
             ],
-            'lessons' => $lessons,
+            'modules' => $modules,
+            'lessons' => $lessons->values(),
             'completedLessonIds' => $completedLessonIds,
         ]);
     }
@@ -79,21 +73,16 @@ class CodingPlaygroundController extends Controller
         CodingLesson $lesson,
         HtmlContentSanitizer $sanitizer
     ): Response {
+        $lesson->loadMissing('module:id,title,is_active');
+
         abort_unless(
-            $track->is_active && $lesson->is_active && (int) $lesson->coding_track_id === (int) $track->id,
+            $track->is_active && (int) $lesson->coding_track_id === (int) $track->id && $lesson->isPubliclyAccessible(),
             404
         );
 
-        $lessons = $track->activeLessons()
-            ->get([
-                'id',
-                'coding_track_id',
-                'title',
-                'slug',
-                'sort_order',
-            ]);
+        ['modules' => $modules, 'lessons' => $lessons] = $this->getOrderedCurriculum($track, includeInstructions: false);
 
-        $currentIndex = $lessons->search(fn ($item) => (int) $item->id === (int) $lesson->id);
+        $currentIndex = $lessons->search(fn ($item) => (int) $item['id'] === (int) $lesson->id);
         $previousLesson = $currentIndex !== false && $currentIndex > 0 ? $lessons[$currentIndex - 1] : null;
         $nextLesson = $currentIndex !== false && $currentIndex < $lessons->count() - 1 ? $lessons[$currentIndex + 1] : null;
 
@@ -118,6 +107,8 @@ class CodingPlaygroundController extends Controller
             'lesson' => [
                 'id' => $lesson->id,
                 'coding_track_id' => $lesson->coding_track_id,
+                'coding_module_id' => $lesson->coding_module_id,
+                'module_title' => $lesson->module?->title,
                 'title' => $lesson->title,
                 'slug' => $lesson->slug,
                 'content' => $sanitizer->sanitize($lesson->content),
@@ -127,18 +118,101 @@ class CodingPlaygroundController extends Controller
                 'instructions' => $lesson->instructions,
                 'sort_order' => $lesson->sort_order,
             ],
-            'lessons' => $lessons,
+            'modules' => $modules,
+            'lessons' => $lessons->values(),
             'previousLesson' => $previousLesson ? [
-                'id' => $previousLesson->id,
-                'title' => $previousLesson->title,
-                'slug' => $previousLesson->slug,
+                'id' => $previousLesson['id'],
+                'title' => $previousLesson['title'],
+                'slug' => $previousLesson['slug'],
             ] : null,
             'nextLesson' => $nextLesson ? [
-                'id' => $nextLesson->id,
-                'title' => $nextLesson->title,
-                'slug' => $nextLesson->slug,
+                'id' => $nextLesson['id'],
+                'title' => $nextLesson['title'],
+                'slug' => $nextLesson['slug'],
             ] : null,
             'completedLessonIds' => $completedLessonIds,
         ]);
+    }
+
+    /**
+     * Build chapter-grouped and sequentially flattened active curriculum for a track.
+     *
+     * @return array{modules: array<int, array<string, mixed>>, lessons: Collection<int, array<string, mixed>>}
+     */
+    private function getOrderedCurriculum(CodingTrack $track, bool $includeInstructions): array
+    {
+        $lessonColumns = [
+            'id',
+            'coding_track_id',
+            'coding_module_id',
+            'title',
+            'slug',
+            'sort_order',
+        ];
+        if ($includeInstructions) {
+            $lessonColumns[] = 'instructions';
+        }
+
+        $activeModules = $track->activeModules()
+            ->with([
+                'activeLessons' => fn ($query) => $query->select($lessonColumns),
+            ])
+            ->get(['id', 'coding_track_id', 'title', 'description', 'sort_order']);
+
+        $ungroupedLessons = CodingLesson::query()
+            ->where('coding_track_id', $track->id)
+            ->whereNull('coding_module_id')
+            ->where('is_active', true)
+            ->ordered()
+            ->get($lessonColumns);
+
+        $mapLesson = function (CodingLesson $item) use ($includeInstructions): array {
+            $mapped = [
+                'id' => $item->id,
+                'coding_track_id' => $item->coding_track_id,
+                'coding_module_id' => $item->coding_module_id,
+                'title' => $item->title,
+                'slug' => $item->slug,
+                'sort_order' => $item->sort_order,
+            ];
+
+            if ($includeInstructions) {
+                $mapped['instructions'] = $item->instructions;
+            }
+
+            return $mapped;
+        };
+
+        $modulesPayload = [];
+        $flatLessons = collect();
+
+        foreach ($activeModules as $module) {
+            $moduleLessons = $module->activeLessons->map($mapLesson)->values();
+            $modulesPayload[] = [
+                'id' => $module->id,
+                'title' => $module->title,
+                'description' => $module->description,
+                'sort_order' => $module->sort_order,
+                'lessons' => $moduleLessons->all(),
+            ];
+            $flatLessons = $flatLessons->concat($moduleLessons);
+        }
+
+        if ($ungroupedLessons->isNotEmpty()) {
+            $mappedUngrouped = $ungroupedLessons->map($mapLesson)->values();
+            $modulesPayload[] = [
+                'id' => null,
+                'title' => count($modulesPayload) > 0 ? 'Materi Lainnya' : 'Daftar Materi',
+                'description' => null,
+                'sort_order' => 999999,
+                'lessons' => $mappedUngrouped->all(),
+            ];
+            $flatLessons = $flatLessons->concat($mappedUngrouped);
+        }
+
+        return [
+            'modules' => $modulesPayload,
+            'lessons' => $flatLessons->values(),
+        ];
     }
 }

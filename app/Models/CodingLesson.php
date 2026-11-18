@@ -14,6 +14,7 @@ class CodingLesson extends Model
 
     protected $fillable = [
         'coding_track_id',
+        'coding_module_id',
         'title',
         'slug',
         'content',
@@ -29,6 +30,7 @@ class CodingLesson extends Model
     {
         return [
             'coding_track_id' => 'integer',
+            'coding_module_id' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
@@ -37,6 +39,26 @@ class CodingLesson extends Model
     public function track(): BelongsTo
     {
         return $this->belongsTo(CodingTrack::class, 'coding_track_id');
+    }
+
+    public function module(): BelongsTo
+    {
+        return $this->belongsTo(CodingModule::class, 'coding_module_id');
+    }
+
+    public function isPubliclyAccessible(): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if ($this->coding_module_id === null) {
+            return true;
+        }
+
+        $module = $this->relationLoaded('module') ? $this->module : $this->module()->first();
+
+        return $module !== null && $module->is_active;
     }
 
     public function progress(): HasMany

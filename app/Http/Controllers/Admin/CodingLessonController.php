@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCodingLessonRequest;
 use App\Http\Requests\Admin\UpdateCodingLessonRequest;
 use App\Models\CodingLesson;
+use App\Models\CodingModule;
 use App\Models\CodingTrack;
 use App\Services\HtmlContentSanitizer;
 use Illuminate\Http\RedirectResponse;
@@ -20,13 +21,23 @@ class CodingLessonController extends Controller
     public function index(Request $request): Response
     {
         $query = CodingLesson::query()
-            ->with(['track:id,title,slug'])
+            ->with(['track:id,title,slug,is_active', 'module:id,coding_track_id,title,is_active'])
             ->orderBy('coding_track_id')
+            ->orderByRaw('CASE WHEN coding_module_id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('coding_module_id')
             ->orderBy('sort_order')
             ->orderBy('id');
 
         if ($request->filled('track_id')) {
             $query->where('coding_track_id', (int) $request->input('track_id'));
+        }
+
+        if ($request->filled('module_id')) {
+            if ($request->input('module_id') === 'none') {
+                $query->whereNull('coding_module_id');
+            } else {
+                $query->where('coding_module_id', (int) $request->input('module_id'));
+            }
         }
 
         if ($request->filled('search')) {
@@ -44,11 +55,17 @@ class CodingLessonController extends Controller
             ->ordered()
             ->get(['id', 'title', 'slug', 'is_active']);
 
+        $modules = CodingModule::query()
+            ->ordered()
+            ->get(['id', 'coding_track_id', 'title', 'is_active']);
+
         return Inertia::render('admin/coding-playground/lessons/index', [
             'lessons' => $lessons,
             'tracks' => $tracks,
+            'modules' => $modules,
             'filters' => [
                 'track_id' => $request->input('track_id') ? (string) $request->input('track_id') : '',
+                'module_id' => $request->input('module_id') ? (string) $request->input('module_id') : '',
                 'search' => $request->input('search'),
                 'per_page' => $perPage,
             ],
@@ -61,9 +78,15 @@ class CodingLessonController extends Controller
             ->ordered()
             ->get(['id', 'title', 'slug', 'is_active']);
 
+        $modules = CodingModule::query()
+            ->ordered()
+            ->get(['id', 'coding_track_id', 'title', 'is_active']);
+
         return Inertia::render('admin/coding-playground/lessons/create', [
             'tracks' => $tracks,
+            'modules' => $modules,
             'defaultTrackId' => $request->input('track_id') ? (string) $request->input('track_id') : ($tracks->first()?->id ? (string) $tracks->first()->id : ''),
+            'defaultModuleId' => $request->input('module_id') ? (string) $request->input('module_id') : '',
         ]);
     }
 
@@ -73,6 +96,7 @@ class CodingLessonController extends Controller
 
         CodingLesson::create([
             'coding_track_id' => (int) $validated['coding_track_id'],
+            'coding_module_id' => ! empty($validated['coding_module_id']) ? (int) $validated['coding_module_id'] : null,
             'title' => $validated['title'],
             'slug' => $validated['slug'],
             'content' => $sanitizer->sanitize($validated['content']),
@@ -95,9 +119,14 @@ class CodingLessonController extends Controller
             ->ordered()
             ->get(['id', 'title', 'slug', 'is_active']);
 
+        $modules = CodingModule::query()
+            ->ordered()
+            ->get(['id', 'coding_track_id', 'title', 'is_active']);
+
         return Inertia::render('admin/coding-playground/lessons/edit', [
             'lesson' => $lesson,
             'tracks' => $tracks,
+            'modules' => $modules,
         ]);
     }
 
@@ -110,6 +139,7 @@ class CodingLessonController extends Controller
 
         $lesson->update([
             'coding_track_id' => (int) $validated['coding_track_id'],
+            'coding_module_id' => ! empty($validated['coding_module_id']) ? (int) $validated['coding_module_id'] : null,
             'title' => $validated['title'],
             'slug' => $validated['slug'],
             'content' => $sanitizer->sanitize($validated['content']),
@@ -151,6 +181,7 @@ class CodingLessonController extends Controller
 
         CodingLesson::create([
             'coding_track_id' => $lesson->coding_track_id,
+            'coding_module_id' => $lesson->coding_module_id,
             'title' => $lesson->title . ' (Salinan)',
             'slug' => $slug,
             'content' => $lesson->content,
