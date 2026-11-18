@@ -13,6 +13,8 @@ use App\Http\Controllers\CertificateDesignController;
 use App\Http\Controllers\CertificateParticipantController;
 use App\Http\Controllers\CertificateSignController;
 use App\Http\Controllers\CertificationProgramController;
+use App\Http\Controllers\CodingLessonProgressController;
+use App\Http\Controllers\CodingPlaygroundController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseDetailController;
 use App\Http\Controllers\EnrollmentProgressController;
@@ -45,6 +47,9 @@ use App\Http\Controllers\User\Profile\WebinarController as ProfileWebinarControl
 use App\Http\Controllers\User\Profile\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\InstallmentController;
+use App\Http\Controllers\Admin\CarouselAdminController;
+use App\Http\Controllers\Admin\CodingLessonController as AdminCodingLessonController;
+use App\Http\Controllers\Admin\CodingTrackController as AdminCodingTrackController;
 use App\Http\Controllers\Admin\InstallmentTermController;
 use App\Http\Controllers\WebinarController;
 use App\Http\Controllers\User\QuizController as UserQuizController;
@@ -139,6 +144,24 @@ Route::get('/article', [UserArticleController::class, 'index'])->name('article.i
 Route::get('/article/{slug}', [UserArticleController::class, 'show'])->name('article.show');
 Route::get('/mentor', [UserMentorController::class, 'index'])->name('mentor.index');
 Route::get('/mentor/{id}', [UserMentorController::class, 'show'])->name('mentor.show');
+
+// Coding Playground (Public Access)
+Route::prefix('coding-playground')->name('coding-playground.')->group(function () {
+    Route::get('/', [CodingPlaygroundController::class, 'index'])->name('index');
+    Route::get('/{track:slug}', [CodingPlaygroundController::class, 'track'])->name('track');
+    Route::get('/{track:slug}/{lesson:slug}', [CodingPlaygroundController::class, 'lesson'])
+        ->scopeBindings()
+        ->name('lesson');
+
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/{track:slug}/{lesson:slug}/complete', [CodingLessonProgressController::class, 'store'])
+            ->scopeBindings()
+            ->name('lesson.complete');
+        Route::delete('/{track:slug}/{lesson:slug}/complete', [CodingLessonProgressController::class, 'destroy'])
+            ->scopeBindings()
+            ->name('lesson.uncomplete');
+    });
+});
 
 Route::get('/course/{course:slug}/checkout', [UserCourseController::class, 'showCheckout'])->name('course.checkout');
 Route::get('/bootcamp/{bootcamp:slug}/register', [UserBootcampController::class, 'showRegister'])->name('bootcamp.register');
@@ -584,6 +607,25 @@ Route::middleware(['auth', 'verified', 'role:admin|mentor|affiliate|staff'])->pr
         Route::delete('installment-terms/{id}', [InstallmentTermController::class, 'destroy'])->name('installment-terms.destroy');
         Route::post('installments/{id}/send-reminder', [InstallmentController::class, 'sendReminder'])->name('installments.send-reminder');
         Route::post('installments/{id}/update-due-date', [InstallmentController::class, 'updateDueDate'])->name('installments.update-due-date');
+    });
+
+    // Coding Playground admin routes
+    Route::prefix('coding-playground')->name('admin.coding-playground.')->group(function () {
+        Route::middleware(['role_or_permission:admin|coding-playground.view|coding-playground.manage'])->group(function () {
+            Route::get('/', fn () => redirect()->route('admin.coding-playground.tracks.index'))->name('index');
+            Route::get('tracks', [AdminCodingTrackController::class, 'index'])->name('tracks.index');
+            Route::get('lessons', [AdminCodingLessonController::class, 'index'])->name('lessons.index');
+        });
+
+        Route::middleware(['role_or_permission:admin|coding-playground.manage'])->group(function () {
+            Route::resource('tracks', AdminCodingTrackController::class)->except(['index', 'show']);
+            Route::patch('tracks/{track}/toggle-status', [AdminCodingTrackController::class, 'toggleStatus'])->name('tracks.toggle-status');
+
+            Route::post('lessons/reorder', [AdminCodingLessonController::class, 'reorder'])->name('lessons.reorder');
+            Route::resource('lessons', AdminCodingLessonController::class)->except(['index', 'show']);
+            Route::post('lessons/{lesson}/duplicate', [AdminCodingLessonController::class, 'duplicate'])->name('lessons.duplicate');
+            Route::patch('lessons/{lesson}/toggle-status', [AdminCodingLessonController::class, 'toggleStatus'])->name('lessons.toggle-status');
+        });
     });
 });
 

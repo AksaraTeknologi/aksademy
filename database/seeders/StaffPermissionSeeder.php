@@ -56,6 +56,7 @@ class StaffPermissionSeeder extends Seeder
                     ['key' => 'transactions', 'label' => 'Transaksi'],
                     ['key' => 'articles', 'label' => 'Artikel'],
                     ['key' => 'referral', 'label' => 'Referral & Poin'],
+                    ['key' => 'coding-playground', 'label' => 'Coding Playground'],
                 ],
             ],
         ];

@@ -207,4 +207,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(PointTransaction::class);
     }
+
+    public function codingLessonProgress()
+    {
+        return $this->hasMany(CodingLessonProgress::class, 'user_id');
+    }
 }
