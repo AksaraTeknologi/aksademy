@@ -15,6 +15,8 @@
     "webinarDesc": "Online seminars featuring cutting-edge topics and expert speakers",
     "private": "Private Class",
     "privateDesc": "1-on-1 personalized mentorship online or offline",
+    "codingPlayground": "Coding Playground",
+    "codingPlaygroundDesc": "Learn HTML, CSS, & JavaScript interactively right in your browser",
     "certification": "Certifications",
     "certificationDesc": "Boost your professional credibility with recognized certifications",
     "checkCertificate": "Verify Certificate",

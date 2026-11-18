@@ -18,7 +18,7 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Album, Award, BookText, BriefcaseBusiness, FileText, Home, MonitorPlay, Presentation, Search, User } from 'lucide-react';
+import { Album, Award, BookText, BriefcaseBusiness, Code2, FileText, Home, MonitorPlay, Presentation, Search, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './language-switcher';
@@ -56,6 +56,14 @@ const serviceItems = [
         defaultDesc: 'Pendampingan intensif 1-on-1 secara online atau offline',
         href: '/private',
         icon: BookText,
+    },
+    {
+        titleKey: 'nav.codingPlayground',
+        descKey: 'nav.codingPlaygroundDesc',
+        defaultTitle: 'Coding Playground',
+        defaultDesc: 'Belajar HTML, CSS, & JavaScript interaktif langsung di browser',
+        href: '/coding-playground',
+        icon: Code2,
     },
 ];
 
@@ -164,7 +172,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                     <NavigationMenuContent>
                                         <ul className="grid w-[600px] gap-3 p-4 md:grid-cols-[.75fr_1fr]">
                                             {/* Row Span - Bundling */}
-                                            <li className="row-span-4">
+                                            <li className="row-span-5">
                                                 <NavigationMenuLink asChild>
                                                     <Link
                                                         href="/bundle"
@@ -194,6 +202,9 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                             </ListItem>
                                             <ListItem href="/private" title={t('nav.private', 'Private Class')} icon={BookText}>
                                                 {t('nav.privateDesc', 'Pendampingan 1-on-1 dengan mentor untuk kebutuhan belajar yang lebih personal')}
+                                            </ListItem>
+                                            <ListItem href="/coding-playground" title={t('nav.codingPlayground', 'Coding Playground')} icon={Code2}>
+                                                {t('nav.codingPlaygroundDesc', 'Belajar HTML, CSS, & JavaScript interaktif langsung di browser')}
                                             </ListItem>
                                         </ul>
                                     </NavigationMenuContent>
