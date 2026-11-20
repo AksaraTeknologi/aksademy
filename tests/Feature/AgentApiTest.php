@@ -360,7 +360,8 @@ it('mengembalikan jadwal hari ini dan status rekaman hari sebelumnya', function 
     expect($webinar['end'])->toBeNull()
         ->and($webinar['has_meeting_link'])->toBeFalse()
         ->and($webinar)->not->toHaveKey('zoom_meeting_id')
-        ->and($webinar)->not->toHaveKey('auto_meeting_link')
+        ->and($webinar['auto_meeting_link'])->toBeFalse()
+        ->and($webinar)->not->toHaveKey('meeting_url')
         ->and($webinar)->not->toHaveKey('group_url');
 });
 
