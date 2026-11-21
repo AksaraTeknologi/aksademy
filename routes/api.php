@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Agent\BrevetClassesController;
 use App\Http\Controllers\Api\Agent\CatalogSummaryController;
 use App\Http\Controllers\Api\Agent\FinancialMetricsController;
 use App\Http\Controllers\Api\Agent\MeetingLinkNeededController;
+use App\Http\Controllers\Api\Agent\MeetingLinksController;
 use App\Http\Controllers\Api\Agent\PaymentReconciliationController;
 use App\Http\Controllers\Api\Agent\PendingInvoicesController;
 use App\Http\Controllers\Api\Agent\ProductBriefController;
@@ -70,6 +71,10 @@ Route::prefix('v1/agent')
             ->middleware(['token.ability:agent:read-pii', 'throttle:6,1'])
             ->name('payment-reconciliation');
 
+        // URL Zoom sesi kelas (rahasia kelas) — hanya token academic (ability write-meeting), tidak ditulis ke vault.
+        Route::get('/meeting-links', MeetingLinksController::class)
+            ->middleware(['token.ability:agent:write-meeting', 'throttle:20,1'])
+            ->name('meeting-links');
         Route::post('/update-meeting-link', UpdateMeetingLinkController::class)
             ->middleware('token.ability:agent:write-meeting')
             ->name('update-meeting-link');

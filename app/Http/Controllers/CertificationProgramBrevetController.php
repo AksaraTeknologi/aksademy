@@ -8,6 +8,7 @@ use App\Services\Brevetlearning\BrevetlearningException;
 use App\Services\Brevetlearning\ProgramParticipants;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Tab Pendaftar ↔ kelas brevetlearning: tanda peserta yang sudah masuk
@@ -103,6 +104,7 @@ class CertificationProgramBrevetController extends Controller
             'participants' => [],
             'summary' => ['eligible' => 0, 'in_class' => 0, 'missing' => 0],
             'error' => null,
+            'notice' => null,
         ];
 
         if (!$base['configured']) {
@@ -114,7 +116,12 @@ class CertificationProgramBrevetController extends Controller
             if ($program->brevetlearning_course_code) {
                 $course ??= $this->client->lookup($program->brevetlearning_course_code);
                 if (!$course) {
-                    $base['error'] = "Kode kelas {$program->brevetlearning_course_code} tidak ditemukan lagi di brevetlearning.";
+                    // Kelas sudah dihapus di brevetlearning: putus hubungan agar Cava & panel tidak menunjuk kelas hantu.
+                    $lama = $program->brevetlearning_course_code;
+                    $program->update(['brevetlearning_course_code' => null, 'brevetlearning_platform' => null]);
+                    Log::info('brevetlearning: hubungan batch diputus, kelas sudah dihapus', ['program_id' => $program->id, 'code' => $lama]);
+                    $base['course_code'] = null;
+                    $base['notice'] = "Kelas {$lama} sudah tidak ada di brevetlearning, jadi hubungannya diputus otomatis. Isi kode baru bila batch ini pindah kelas.";
                 }
             }
         } catch (BrevetlearningException $e) {

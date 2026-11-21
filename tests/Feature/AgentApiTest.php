@@ -360,7 +360,8 @@ it('mengembalikan jadwal hari ini dan status rekaman hari sebelumnya', function 
     expect($webinar['end'])->toBeNull()
         ->and($webinar['has_meeting_link'])->toBeFalse()
         ->and($webinar)->not->toHaveKey('zoom_meeting_id')
-        ->and($webinar)->not->toHaveKey('auto_meeting_link')
+        ->and($webinar['auto_meeting_link'])->toBeFalse()
+        ->and($webinar)->not->toHaveKey('meeting_url')
         ->and($webinar)->not->toHaveKey('group_url');
 });
 
@@ -440,6 +441,30 @@ it('melaporkan jadwal yang butuh link Zoom, terpisah otomatis dan manual', funct
     agentGet('/api/v1/agent/schedules-needing-meeting-link?days=30', $this->token)
         ->assertOk()->assertJsonCount(3, 'items');
     agentGet('/api/v1/agent/schedules-needing-meeting-link?days=99', $this->token)->assertUnprocessable();
+});
+
+it('mengirim URL Zoom sesi hanya ke token academic, tanpa bocor ke jadwal umum', function () {
+    $bootcamp = makeBootcamp(['title' => 'Launch Your Dev Journey']);
+    $denganLink = makeSession($bootcamp, '2026-11-09', '19:00:00', '21:00:00', attrs: ['meeting_url' => 'https://us06web.zoom.us/j/111?pwd=abc']);
+    $tanpaLink = makeSession($bootcamp, '2026-11-09', '13:00:00', '15:00:00');
+    makeSession($bootcamp, '2026-11-11', attrs: ['meeting_url' => 'https://us06web.zoom.us/j/222']);
+
+    $res = agentGet('/api/v1/agent/meeting-links', writerToken())->assertOk();
+    $items = collect($res->json('items'));
+    expect($items)->toHaveCount(2)
+        ->and($items->firstWhere('id', $denganLink->id)['meeting_url'])->toBe('https://us06web.zoom.us/j/111?pwd=abc')
+        ->and($items->firstWhere('id', $tanpaLink->id)['meeting_url'])->toBeNull()
+        ->and($items->first())->not->toHaveKey('zoom_meeting_id')
+        ->and($items->first())->not->toHaveKey('group_url');
+
+    agentGet('/api/v1/agent/meeting-links?date=2026-11-09&days=3', writerToken())->assertOk()->assertJsonCount(3, 'items');
+    agentGet('/api/v1/agent/meeting-links?days=8', writerToken())->assertUnprocessable();
+
+    // Token read-only (Sena dkk.) ditolak, dan jadwal umum tidak memuat URL.
+    agentGet('/api/v1/agent/meeting-links', $this->token)->assertForbidden();
+    $jadwal = collect(agentGet('/api/v1/agent/schedules-and-recordings', $this->token)->json('today'));
+    expect($jadwal->firstWhere('id', $denganLink->id))->not->toHaveKey('meeting_url')
+        ->and($jadwal->firstWhere('id', $denganLink->id)['has_meeting_link'])->toBeTrue();
 });
 
 it('melaporkan rekaman yang belum diisi hanya untuk meeting buatan agent dalam jendela 48 jam', function () {
@@ -928,7 +953,8 @@ it('agent:token --pii menambah ability agent:read-pii', function () {
 
 function fakeDoku(array $statuses): void
 {
-    app()->instance(\App\Services\DokuService::class, new class($statuses) extends \App\Services\DokuService {
+    app()->instance(\App\Services\DokuService::class, new class($statuses) extends \App\Services\DokuService
+    {
         public array $asked = [];
 
         public function __construct(private array $statuses) {}
@@ -998,7 +1024,8 @@ it('payment-reconciliation: cocok, lunas tanpa bukti DOKU, dan bayar DOKU yang b
 it('payment-reconciliation: galat DOKU dihitung terpisah, bukan dianggap tidak cocok', function () {
     Carbon::setTestNow(Carbon::parse('2026-11-09 01:30:00', 'Asia/Jakarta'));
     reconInvoice('INV-X', 'paid', ['created_at' => '2026-11-08 09:00:00']);
-    app()->instance(\App\Services\DokuService::class, new class extends \App\Services\DokuService {
+    app()->instance(\App\Services\DokuService::class, new class extends \App\Services\DokuService
+    {
         public function __construct() {}
 
         public function checkStatus(string $invoiceNumber): array
@@ -1018,7 +1045,7 @@ it('DokuService::checkStatus menandatangani GET tanpa Digest dan membaca transac
         'api-sandbox.doku.com/orders/v1/status/INV-404' => \Illuminate\Support\Facades\Http::response([], 404),
     ]);
 
-    $svc = new \App\Services\DokuService();
+    $svc = new \App\Services\DokuService;
     expect($svc->checkStatus('INV-1'))->toBe(['status' => 'SUCCESS', 'http' => 200])
         ->and($svc->checkStatus('INV-404')['status'])->toBe('NOT_FOUND');
 

@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:public/build/assets/benefits-section-iG-xKjAj.js
 import{j as e}from"./app-BQB_uKxf.js";import{u as l}from"./useTranslation-EcvCoHk7.js";import{B as o}from"./badge-check-CBOpHQYI.js";/* empty css            */import"./createLucideIcon-CcrvUoLV.js";function m(s){if(!s)return[];const i=String(s).trim();if(!i)return[];const r=i.match(/<li[^>]*>[\s\S]*?<\/li>/gi),n=i.replace(/<br\s*\/?\s*>/gi,`
+========
+import{j as e}from"./app-PANsnntS.js";import{u as l}from"./useTranslation-Bk8SMiXx.js";import{B as o}from"./badge-check-CEdi5Ils.js";/* empty css            */import"./createLucideIcon-DxIxPVcq.js";function m(s){if(!s)return[];const i=String(s).trim();if(!i)return[];const r=i.match(/<li[^>]*>[\s\S]*?<\/li>/gi),n=i.replace(/<br\s*\/?\s*>/gi,`
+>>>>>>>> 63516de58ca2876d804551af46210ee2c6c0de4c:public/build/assets/benefits-section-CqHQBgr2.js
 `).replace(/<\/p>/gi,`
 `).replace(/<\/div>/gi,`
 `).replace(/<[^>]+>/g,"").replace(/\r\n?/g,`

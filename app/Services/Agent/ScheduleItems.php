@@ -27,7 +27,7 @@ class ScheduleItems
     ];
 
     /** Kunci yang tidak ikut di respons jadwal umum. */
-    public const INTERNAL_KEYS = ['zoom_meeting_id', 'auto_meeting_link', 'group_url'];
+    public const INTERNAL_KEYS = ['zoom_meeting_id', 'auto_meeting_link', 'group_url', 'meeting_url'];
 
     /** Semua sesi dengan tanggal mulai di antara $from dan $to (inklusif), urut waktu mulai. */
     public function between(Carbon $from, Carbon $to): Collection
@@ -95,6 +95,7 @@ class ScheduleItems
                 'end' => $w->end_time ? Carbon::parse($w->end_time)->toIso8601String() : null,
                 'has_recording' => filled($w->recording_url),
                 'has_meeting_link' => filled($w->meeting_url),
+                'meeting_url' => $w->meeting_url,
                 'zoom_meeting_id' => $w->zoom_meeting_id,
                 'auto_meeting_link' => (bool) $w->auto_meeting_link,
                 'group_url' => $w->group_url,
@@ -175,6 +176,7 @@ class ScheduleItems
             'end' => Carbon::parse("{$day} {$schedule->end_time}", $tz)->toIso8601String(),
             'has_recording' => filled($schedule->recording_url),
             'has_meeting_link' => filled($schedule->meeting_url),
+            'meeting_url' => $schedule->meeting_url,
             'zoom_meeting_id' => $schedule->zoom_meeting_id,
             'auto_meeting_link' => (bool) $parent?->auto_meeting_link,
             'group_url' => $parent?->group_url,

@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:public/build/assets/register-section-DMy45UmE.js
 import{j as e,$ as g}from"./app-BQB_uKxf.js";import{B as h}from"./button-ChpllMz2.js";import{S as p}from"./separator-CnQx2Xj8.js";import{u}from"./useTranslation-EcvCoHk7.js";import{B as a}from"./badge-check-CBOpHQYI.js";import{c}from"./createLucideIcon-CcrvUoLV.js";import{P as j}from"./presentation-LKMkqgEe.js";import{S as f}from"./smartphone-drxSLWlj.js";/* empty css            */import"./index-DPtp2VlW.js";import"./utils-CzGOe0Tz.js";import"./index-BL-LjikJ.js";import"./index-MmkIWTSq.js";/**
+========
+import{j as e,$ as g}from"./app-PANsnntS.js";import{B as h}from"./button-CEc62nMq.js";import{S as p}from"./separator-DH48Na8r.js";import{u}from"./useTranslation-Bk8SMiXx.js";import{B as a}from"./badge-check-CEdi5Ils.js";import{c}from"./createLucideIcon-DxIxPVcq.js";import{P as j}from"./presentation-CMhwdX0g.js";import{S as f}from"./smartphone-0Q8eh4dJ.js";/* empty css            */import"./index-B9R2FCHF.js";import"./utils-BnFXb_GJ.js";import"./index-fKzh_y8P.js";import"./index-BlugpL_E.js";/**
+>>>>>>>> 63516de58ca2876d804551af46210ee2c6c0de4c:public/build/assets/register-section-Bcl2Ihtd.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

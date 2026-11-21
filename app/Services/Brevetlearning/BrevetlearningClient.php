@@ -30,12 +30,19 @@ class BrevetlearningClient
         return Cache::remember('brevetlearning.platforms', 600, fn () => $this->get('/platforms')['data'] ?? []);
     }
 
-    /** Kelas berdasarkan kode; null bila tidak ditemukan. */
+    /**
+     * Kelas berdasarkan kode; null HANYA bila brevetlearning sendiri menjawab "kode tidak ditemukan"
+     * (404 + {"success": false}). 404 lain (alamat API salah, halaman nginx) dilempar sebagai galat agar
+     * pemutusan otomatis tidak terjadi karena salah konfigurasi.
+     */
     public function lookup(string $code): ?array
     {
         $response = $this->send(fn (PendingRequest $http) => $http->get('/courses/lookup', ['code' => $code]));
         if ($response->status() === 404) {
-            return null;
+            if ($response->json('success') === false) {
+                return null;
+            }
+            throw new BrevetlearningException('Alamat API brevetlearning tidak dikenali (404). Cek BREVETLEARNING_API_URL.');
         }
 
         return $this->json($response)['data'] ?? null;

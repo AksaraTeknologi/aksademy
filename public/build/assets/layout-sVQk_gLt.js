@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:public/build/assets/layout-sVQk_gLt.js
 import{K as m,j as e,$ as f}from"./app-BQB_uKxf.js";import{A as d,a as x,b as h}from"./avatar-Dz7FaVtx.js";import{B as p}from"./button-ChpllMz2.js";import{u}from"./use-initials-vU8M1Ujj.js";import{c as b}from"./utils-CzGOe0Tz.js";import{u as y}from"./useTranslation-EcvCoHk7.js";import{c as g}from"./createLucideIcon-CcrvUoLV.js";import{B as w}from"./book-text-DtxtwFt7.js";import{P as j}from"./presentation-LKMkqgEe.js";import{B as v}from"./user-layout-Aln6-Za3.js";import{M as N}from"./monitor-play-gITbkzf5.js";import{B as k}from"./banknote-BvSz2n21.js";import{C as B}from"./calendar-clock-CG6eLgJw.js";import{G as P}from"./gift-YHBoYwjQ.js";import{o as I}from"./breadcrumbs-s6vqOEFt.js";/**
+========
+import{K as m,j as e,$ as f}from"./app-PANsnntS.js";import{A as d,a as x,b as h}from"./avatar-VCk_TH3Z.js";import{B as p}from"./button-CEc62nMq.js";import{u}from"./use-initials-ZLd4Wqn5.js";import{c as b}from"./utils-BnFXb_GJ.js";import{u as y}from"./useTranslation-Bk8SMiXx.js";import{c as g}from"./createLucideIcon-DxIxPVcq.js";import{B as w}from"./book-text-AejML22f.js";import{P as j}from"./presentation-CMhwdX0g.js";import{B as v}from"./user-layout-CC4dDEnI.js";import{M as N}from"./monitor-play-BYrwZD75.js";import{B as k}from"./banknote-D05gShS6.js";import{C as B}from"./calendar-clock-35sFKAKP.js";import{G as P}from"./gift-B9bQtTTj.js";import{o as I}from"./breadcrumbs-H6L-ArhC.js";/**
+>>>>>>>> 63516de58ca2876d804551af46210ee2c6c0de4c:public/build/assets/layout-DDG1C4nb.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

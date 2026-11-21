@@ -16,6 +16,8 @@ use Illuminate\Support\Collection;
  * Jadwal webinar, sesi bootcamp, dan sesi program sertifikasi pada tanggal
  * tersebut (default hari ini) dan hari sebelumnya, beserta status link Zoom
  * (`meeting_url`) dan rekaman. Kelas online & bundle tidak punya jadwal.
+ * `auto_meeting_link` (boolean) ikut dikirim: pengingat link/rekaman agent hanya
+ * untuk produk "Link Zoom otomatis" (keputusan 2026-11-20). URL tetap tidak dikirim.
  */
 class ScheduleController extends Controller
 {
@@ -54,6 +56,8 @@ class ScheduleController extends Controller
 
     private function publicItems(Collection $items): Collection
     {
-        return $items->map(fn (array $item) => Arr::except($item, ScheduleItems::INTERNAL_KEYS))->values();
+        $hidden = array_diff(ScheduleItems::INTERNAL_KEYS, ['auto_meeting_link']);
+
+        return $items->map(fn (array $item) => Arr::except($item, $hidden))->values();
     }
 }
